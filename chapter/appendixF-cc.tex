@@ -1,0 +1,734 @@
+\chapter{计算能力}
+\label{sec:cc}
+
+设备的计算能力决定了它大部分规范和特性。
+
+\ref{sec:featureTech}给出了各计算能力设备的特性和技术规范。
+
+\ref{sec:floatpointstandard}回顾了与IEEE浮点标准的符合程度。
+
+\ref{sec:cc1x}、\ref{sec:cc2x}和\ref{sec:cc3x}分别给出了计算能力1.x、2.x和3.x的设备更多架构细节。
+
+\section{特性和技术规范}
+\label{sec:featureTech}
+
+\begin{longtable}{|p{120pt}|p{37pt}|p{37pt}|p{37pt}|p{37pt}|p{37pt}|p{37pt}|}
+\caption{不同计算能力支持的特性}\\
+\hline
+特性支持&
+\multicolumn{6}{|p{226pt}|}{计算能力}  \\
+\hline
+特性支持（所有计算能力都支持的特性没有列出）&
+1.0& 1.1& 1.2& 1.3& 2.x, 3.0& 3.5 \\
+\hline
+作用在全局存储器上32位整形原子函数（参见\ref{sec:atomic}）&
+\raisebox{-1.50ex}[0cm][0cm]{No}&
+\multicolumn{5}{|p{189pt}|}{\raisebox{-1.50ex}[0cm][0cm]{Yes}} \\
+\cline{1-1}
+作用在全局存储器上32位浮点原子函数atomicExch()（参见\ref{sec:atomic}）&
+ &
+\multicolumn{5}{|p{189pt}|}{}  \\
+\hline
+作用在共享存储器上32位字的整形原子函数（参见\ref{sec:atomic}）&
+\multicolumn{2}{|p{90pt}|}{\raisebox{-4.50ex}[0cm][0cm]{No}}&
+\multicolumn{4}{|p{151pt}|}{\raisebox{-4.50ex}[0cm][0cm]{Yes}} \\
+\cline{1-1}
+作用在共享存储器上32位浮点原子函数atomicExch()（参见\ref{sec:atomic}）&
+\multicolumn{2}{|p{90pt}|}{} &
+\multicolumn{4}{|p{151pt}|}{}  \\
+\cline{1-1}
+作用在全局存储器上64位字的整形原子函数（参见\ref{sec:atomic}）&
+\multicolumn{2}{|p{90pt}|}{} &
+\multicolumn{4}{|p{151pt}|}{}  \\
+\cline{1-1}
+束表决函数（参见\ref{sec:warpvote}）&
+\multicolumn{2}{|p{90pt}|}{} &
+\multicolumn{4}{|p{151pt}|}{}  \\
+\hline
+双精度浮点数&
+\multicolumn{3}{|p{112pt}|}{No} &
+\multicolumn{3}{|p{114pt}|}{Yes}  \\
+\hline
+作用在共享存储器上的64位整型原子函数（参见\ref{sec:atomic}）&
+\multicolumn{4}{|p{125pt}|}{\raisebox{-9.00ex}[0cm][0cm]{No}}&
+\multicolumn{2}{|p{76pt}|}{\raisebox{-9.00ex}[0cm][0cm]{Yes}} \\
+\cline{1-1}
+作用在全局和共享存储器上32位字的浮点原子加函数（参见\ref{sec:atomic}）&
+\multicolumn{4}{|p{125pt}|}{} &
+\multicolumn{2}{|p{76pt}|}{}  \\
+\cline{1-1}
+{\_}{\_}ballot()（参见\ref{sec:warpvote}）&
+\multicolumn{4}{|p{125pt}|}{} &
+\multicolumn{2}{|p{76pt}|}{}  \\
+\cline{1-1}
+{\_}{\_}theadfence{\_}system()（参见\ref{sec:memfence}）&
+\multicolumn{4}{|p{125pt}|}{} &
+\multicolumn{2}{|p{76pt}|}{}  \\
+\cline{1-1}
+{\_}{\_}syncthreads{\_}count(),\par {\_}{\_}syncthreads{\_}and(), \par syncthreads{\_}or()（）&
+\multicolumn{4}{|p{150pt}|}{} &
+\multicolumn{2}{|p{76pt}|}{}  \\
+\cline{1-1}
+表面函数（）&
+\multicolumn{4}{|p{150pt}|}{} &
+\multicolumn{2}{|p{76pt}|}{}  \\
+\cline{1-1}
+三维线程网格&
+\multicolumn{4}{|p{150pt}|}{} &
+\multicolumn{2}{|p{76pt}|}{}  \\
+\hline
+束洗牌函数&
+\multicolumn{5}{|p{189pt}|}{No} &
+Yes \\
+\hline
+\end{longtable}
+
+\begin{longtable}{|p{100pt}|p{25pt}|p{25pt}|p{25pt}|p{25pt}|p{25pt}|p{25pt}|p{25pt}|}
+\caption{依据计算能力的技术规范} \label{tab:texturespecification} \\
+\hline
+&
+\multicolumn{7}{|p{175pt}|}{计算能力}  \\
+\hline
+技术规范&
+1.0&
+1.1&
+1.2&
+1.3&
+2.x&
+3.0&
+3.5 \\
+\hline
+线程网格的最大维数&
+\multicolumn{4}{|p{100pt}|}{2} &
+\multicolumn{3}{|p{75pt}|}{3}  \\
+\hline
+网格的最大x维最大尺寸&
+\multicolumn{5}{|p{125pt}|}{65535} &
+\multicolumn{2}{|p{50pt}|}{$2^{31}-1$}  \\
+\hline
+网格的最大y和z维尺寸&
+\multicolumn{7}{|p{175pt}|}{65535}  \\
+\hline
+线程块的最大维数&
+\multicolumn{7}{|p{175pt}|}{3}  \\
+\hline
+块最大x或y维尺寸&
+\multicolumn{4}{|p{100pt}|}{512} &
+\multicolumn{3}{|p{75pt}|}{1024}  \\
+\hline
+块最大z维尺寸&
+\multicolumn{7}{|p{175pt}|}{64}  \\
+\hline
+块内最大线程数&
+\multicolumn{4}{|p{100pt}|}{512} &
+\multicolumn{3}{|p{75pt}|}{1024}  \\
+\hline
+线程束（warp）尺寸&
+\multicolumn{7}{|p{175pt}|}{32}  \\
+\hline
+多处理器最大常驻块数量&
+\multicolumn{5}{|p{125pt}|}{8} &
+\multicolumn{2}{|p{50pt}|}{16}  \\
+\hline
+多处理器最大常驻线程束数量&
+\multicolumn{2}{|p{50pt}|}{24} &
+\multicolumn{2}{|p{50pt}|}{32} &
+48&
+\multicolumn{2}{|p{50pt}|}{64}  \\
+\hline
+多处理器最大常驻线程数量&
+\multicolumn{2}{|p{50pt}|}{768} &
+\multicolumn{2}{|p{50pt}|}{1024} &
+1536&
+\multicolumn{2}{|p{50pt}|}{2048}  \\
+\hline
+多处理器的32位寄存器数量&
+\multicolumn{2}{|p{50pt}|}{8K} &
+\multicolumn{2}{|p{105pt}|}{16k} &
+32k&
+\multicolumn{2}{|p{102pt}|}{64k}  \\
+\hline
+每线程的最大32位寄存器数量&
+\multicolumn{4}{|p{100pt}|}{128} &
+\multicolumn{2}{|p{50pt}|}{63} &
+255 \\
+\hline
+多处理器最大共享存储器数量&
+\multicolumn{4}{|p{100pt}|}{16 KB} &
+\multicolumn{3}{|p{75pt}|}{48 KB}  \\
+\hline
+共享存储器存储体数量&
+\multicolumn{4}{|p{100pt}|}{16} &
+\multicolumn{3}{|p{75pt}|}{32}  \\
+\hline
+线程的本地存储器数量&
+\multicolumn{4}{|p{100pt}|}{16 KB} &
+\multicolumn{3}{|p{75pt}|}{512 KB}  \\
+\hline
+常量存储器尺寸&
+\multicolumn{7}{|p{175pt}|}{64 KB}  \\
+\hline
+每个多处理器常量缓存数量&
+\multicolumn{7}{|p{175pt}|}{8 KB}  \\
+\hline
+多处理器纹理缓存数量&
+\multicolumn{7}{|p{175pt}|}{和设备相关，在6 KB到8 KB之间}  \\
+\hline
+绑定到CUDA数组的一维纹理参考最大宽度&
+\multicolumn{4}{|p{100pt}|}{8192} &
+\multicolumn{3}{|p{75pt}|}{65535}  \\
+\hline
+绑定到线性存储器的一维纹理参考最大宽度&
+\multicolumn{7}{|p{175pt}|}{2\ 27}  \\
+\hline
+一维层次纹理参考的最大宽度和层次数&
+\multicolumn{4}{|p{100pt}|}{8192*512} &
+\multicolumn{3}{|p{75pt}|}{16384*2048}  \\
+\hline
+绑定到CUDA数组的二维纹理参考的最大宽和高&
+\multicolumn{4}{|p{100pt}|}{65535*32768} &
+\multicolumn{3}{|p{75pt}|}{65535*65535}  \\
+\hline
+绑定到线性存储器的二维纹理参考的最大宽和高&
+\multicolumn{4}{|p{100pt}|}{65000*65000} &
+\multicolumn{3}{|p{75pt}|}{65000*65000}  \\
+\hline
+绑定到支持纹理收集的CUDA数组的二维纹理参考的最大宽和高&
+\multicolumn{4}{|p{100pt}|}{N/A} &
+\multicolumn{3}{|p{75pt}|}{16384 x 16384}  \\
+\hline
+二维层次纹理参考的最大宽度、高度和层次数&
+\multicolumn{4}{|p{100pt}|}{8192 x 8192 x 512} &
+\multicolumn{3}{|p{75pt}|}{16384 x 16384 x 2048}  \\
+\hline
+绑定到CUDA数组的三维纹理参考的最大宽度，调度和深度&
+\multicolumn{5}{|p{125pt}|}{2048 x 2048 x 2048} &
+\multicolumn{2}{|p{50pt}|}{4096 x 4096 x 4096}  \\
+\hline
+立方位图纹理参考的最大宽度（和高度）&
+\multicolumn{4}{|p{100pt}|}{N/A} &
+\multicolumn{3}{|p{75pt}|}{16384}  \\
+\hline
+层次立方位图参考的最大宽度（和高度）和层数&
+\multicolumn{4}{|p{100pt}|}{N/A} &
+\multicolumn{3}{|p{75pt}|}{16384 x 2046}  \\
+\hline
+一个内核可以绑定的最大纹理数目&
+\multicolumn{5}{|p{125pt}|}{128} &
+\multicolumn{2}{|p{50pt}|}{256}  \\
+\hline
+绑定到CUDA数组的一维表面参考的最大宽度&
+\multicolumn{4}{|p{100pt}|}{N/A}&
+\multicolumn{3}{|p{75pt}|}{65535}  \\
+\cline{1-1} \cline{6-8}
+一维层次表面参考的最大宽度和层数&
+\multicolumn{4}{|p{100pt}|}{} &
+\multicolumn{3}{|p{75pt}|}{65536 x 2048}  \\
+\cline{1-1} \cline{6-8}
+绑定到CUDA数组的二维表面参考的最大宽度和高度&
+\multicolumn{4}{|p{100pt}|}{} &
+\multicolumn{3}{|p{75pt}|}{65536 x 32768}  \\
+\cline{1-1} \cline{6-8}
+二维层次表面参考的最大宽度，高度和层数&
+\multicolumn{4}{|p{100pt}|}{} &
+\multicolumn{3}{|p{75pt}|}{65536 x 32768 x 2048}  \\
+\cline{1-1} \cline{6-8}
+绑定到CUDA数组的三维表面参考的最大宽度，高度和深度&
+\multicolumn{4}{|p{100pt}|}{} &
+\multicolumn{3}{|p{75pt}|}{65536 x 32768 x 2048}  \\
+\cline{1-1} \cline{6-8}
+绑定到CUDA数组的立方位图表面参考的最大宽度（和高度）&
+\multicolumn{4}{|p{100pt}|}{} &
+\multicolumn{3}{|p{75pt}|}{32768}  \\
+\cline{1-1} \cline{6-8}
+内核绑定的最大表面数目&
+\multicolumn{4}{|p{100pt}|}{} &
+8&
+\multicolumn{2}{|p{50pt}|}{16}  \\
+\hline
+内核的最大指令数量&
+\multicolumn{4}{|p{100pt}|}{2百万} &
+\multicolumn{3}{|p{75pt}|}{5亿1千2百万}  \\
+\hline
+\end{longtable}
+
+\section{浮点标准}
+
+所有计算设备对于二进制浮点算术服从IEEE 754-2008标准，有下列偏差：
+\begin{itemize}
+\item 没有动态可配置的舍入模式，但是大多数操作支持多种IEEE舍入模式，这通过设备内置指令的方式展现；
+\item 没有检测浮点异常发生的机制且所有的异常操作行为像IEEE-754异常一样总是被屏蔽，并像IEEE-754定义的一样如果异常发生就传递屏蔽的响应；同样的原因，支持SNaN解码，它们并不通知且被静默处理；
+\item 包含一个或多个NaN输入的单精度浮点操作的结果是NaN，其位模式为0x7fffffff；
+\item 对于NaN，双精度浮点绝对值和求负不符合IEEE-754标准；它们的结果就是自身；
+\item 对于计算能力1.x的设备上的单精度浮点数：
+\begin{itemize}
+\item 不支持非规格化数；浮点算术和比较指令在操作之前将非规格化操作数转化为0；
+\item 下溢的结果刷为0；
+\item 一些指令是不服从IEEE的：
+\begin{itemize}
+\item 加法和乘法经常被组合成乘加指令（FMAD），它截取（也就是说没有舍入）乘法的中间尾数；
+\item 除法以非标准的方式通过倒数实现；
+\item 平方根以非标准的方式通过倒数平方根实现；
+\item 对于加法和乘法，只有舍入到最近偶数和向零舍入通过静态舍入得到支持；不支持直接舍入到正负无穷；
+\end{itemize}
+为了缓和这些限制，通过下列内置方式提供符合IEEE的软（因此更慢）实现（参见\ref{sec:intrinsic}）：
+\begin{itemize}
+\item {\_}{\_}fmaf{\_}r[n,z,u,d](float,float,float)：IEEE舍入模式的单精度积和乘加，
+\item {\_}{\_}frcp{\_}r[n,z,u,d](float)：IEEE舍入模式的单精度倒数，
+\item {\_}{\_}fdiv{\_}r[n,z,u,d](float,float)：IEEE舍入模式的单精度除法，
+\item {\_}{\_}fsqrt{\_}r[n,z,u,d](float)：IEEE舍入模式的单精度平方根，
+\item {\_}{\_}fadd{\_}r[n,z,u,d](float,float)：IEEE直接舍入模式的单精度加法，
+\item {\_}{\_}fmul{\_}r[u,d](float,float)：IEEE直接舍入模式的单精度乘法;
+\end{itemize}
+\item 对于计算能力1.x的设备上的双精度浮点数：
+\begin{itemize}
+\item 舍入到最近偶数是唯一支持倒数，除法和平方根的IEEE舍入模式。
+\end{itemize}
+\end{itemize}
+\end{itemize}
+当在没有本地双精度浮点支持的的设备上编译时，也就是说，计算能力1.2或更低的设备，每个双精度变量转化为单精度浮点格式（但依旧保持64位长度）且双精度算术降级为单精度算术。
+
+对于计算能力2.x及以上的设备，代码必须使用-ftz=false，-prec-div=true和-prec-sqrt=true以保证符合IEEE（这是默认设置，详细的编译选项参见nvcc用户手册）；使用-ftz=true,-prec-div=false和-prec-sqrt=false编译的代码更接近为计算能力1.x设备生成的代码。
+
+加法和乘法经常被组合成一个单独的乘加指令：
+\begin{itemize}
+\item 为计算能力1.x的设备生成单精度的FMAD
+\item 为计算能力2.x的设备生成单精度的FFMA
+\end{itemize}
+如上所示，FMAD截取加法使用之前的尾数。另一方面，FFMA是符合IEEE-754(2008)的积和乘加指令，所以在加法中使用全宽度的乘积且在产生最终结果中有一次舍入。而FFMA相比FMAD通常有更好数值特性，从FMAD切换到FFMA在数值上结果上能产生极小的变化但是极少导致最终结果的大误差。
+
+依据IEEE-754R标准，如果对fminf(),fmin(),fmaxf()或fmx()中之一而言，输入参数是NaN，但是其它的不是，结果是非NaN参数。
+
+IEEE-754没有定义当将浮点数转化为整数时，值超出整数格式表示的范围时的行为。对于计算设备，其行为是将结果钳位到支持的范围的最后一个值，这和x86不一样。
+
+IEEE-754没有定义整数除以0和整数上溢时的行为。对于计算设备来说，没有机制检测这些异常的发生。整数除以0会产生一个不确定的，设备特定的值。
+
+\href{http://developer.nvidia.com/content/precision-performance-floating-point-and-ieee-754-compliance-nvidia-gpus}{这里}包含了更多NVIDIA GPU的浮点精确度的信息。
+
+\section{计算能力1.x}
+\label{sec:cc1x}
+\subsection{架构}
+
+对于计算能力1.x，一个多处理器包含：
+\begin{itemize}
+\item 8个CUDA核心用于算术操作，
+\item 1个双精度浮点操作单元用于双精度浮点算术操作（计算能力1.3），
+\item 2个特殊函数单元用于单精度浮点超越函数（这些单元同时也处理单精度浮点乘法），
+\item 1个束调度器。
+\end{itemize}
+为了为束内所有线程执行一条指令，束调度器发射指令必须花费：
+\begin{itemize}
+\item 为整数和单精度浮点算术指令4个时钟周期，
+\item 为双精度浮点算术指令32个时钟周期(这只对计算能力1.3的设备)，
+\item 为单精度超越指令16个时钟周期。
+\end{itemize}
+每个多处理器有一个被所有功能单元共享的只读的常量缓存，加速来自常量存储器空间的读操作，常量存储器在设备存储器中。
+
+多处理器组成纹理处理集群（Texture Processor Cluster，TPC）。每个TPC中多处理器数目是：
+\begin{itemize}
+\item 对于计算能力1.0和1.1的设备是2，
+\item 对于计算能力1.2和1.3的设备是3.
+\end{itemize}
+每个TPC有一个被所有多处理器共享的只读纹理缓存，加速来自纹理存储器空间的读操作，纹理存储器在设备存储器中。每个多处理器通过纹理单元来访问纹理缓存，纹理单元实现了\ref{sec:textureAndSurfacemem}提到的多种寻址模式和数据滤波。
+
+全局存储器和本地存储器在设备存储器中且没有缓存。
+
+\subsection{全局存储器}
+
+来自一个束的一个全局存储器请求被分成两个存储器请求，每个对应半束，独立发射。\ref{sec:cc10cc11}和\ref{sec:cc12cc13}描述了半束线程的存储器访问如何被合并成一次或多次存储器事务，这依赖于设备计算能力。\ref{fig:globalmemaccess}显示了一些基于计算能力的全局存储器访问和对应存储器事务的例子。
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[bb=0 0 364 546]{figures/examples-of-global-memory-accesses.png}
+\caption{一个线程束访问全局存储器的例子，每个线程4字节和相关的基于计算能力的存储器事务}
+\label{fig:globalmemaccess}
+\end{figure}
+
+最终的存储器事务贡献了存储器吞吐量。
+
+\subsubsection{计算能力1.0和1.1的设备}
+\label{sec:cc10cc11}
+为了合并访问，半束的存储器请求必须满足下列条件：
+\begin{itemize}
+\item 线程读的字的长度必须是4,8或16字节，
+\item 如果长度是：
+\begin{itemize}
+\item 4,所有的16个字必须在同一64字节段中，
+\item 8，所有的16个字必须在同一128字节段中，
+\item 16，前8个字必须在同一128字节段中，后8个字必须在随后的128字节段中；
+\end{itemize}
+\item 线程必须顺序的访问字：半束中第k个线程访问第k个字。
+\end{itemize}
+
+如果半束满足这些要求，如果线程访问的字的长度分别为4，8，16字节，分别发射一个64字节存储器事务，一个128字节存储器事务或2个128字节存储器事务。即使束产生了分支也会合并，也就是说，一些活动线程并没有真正访问存储器。
+
+如果半束不满足这些条件，16个单独的32位存储器事务被发射。
+
+\subsubsection{计算能力1.2和1.3的设备}
+\label{sec:cc12cc13}
+线程可以以任意顺序访问任意字，包括同一字，为半束寻址的每个段发射一次存储器事务。这和计算能力1.0和1.1的设备要求线程顺序访问字且只有半束寻址单一段时才能合并不同。
+
+更准确地，使用下面的协议决定半束内线程必要的存储器事务：
+\begin{itemize}
+\item 找出最小编号活动线程寻址的存储器片段。段的长度由线程访问的字的长度决定：
+\begin{itemize}
+\item 1字节的字32字节
+\item 2字节的字64字节
+\item 4，8，16字节的字128字节
+\end{itemize}
+\item 找出其它地址在同一段内的活动线程
+\item 减小事务长度，如果可能：
+\begin{itemize}
+\item 如果事务是128字节且只有下半部分或上半部分被使用，减小事务到64字节；
+\item 如果事务是64字节（原始的或者从128字节减小后的）且只有上半部分或下半部分被使用，减小事务到32字节。
+\end{itemize}
+\item 执行事务且标记已访问数据的线程为非活动的。
+\item 重复直到半束内所有线程得到服务。
+\end{itemize}
+
+\subsection{共享存储器}
+
+共享存储器被组织成16个存储体使得相邻32位字被分配到相邻的存储体。每个存储体每两个时钟周期有32位带宽。
+
+束的一次共享存储器访问被分成两次存储器访问，每次为半个线程束（half warp）发射指令，两个半束之间是相互独立的串行发射，因此前半束的线程和后半束的线程不可能出现存储体冲突）。
+
+如果束执行非原子指令为束内多个线程写共享存储器的同一位置，半束里只有一个线程执行写操作且哪个线程执行最后的写操作没有定义。
+
+\subsubsection{32位步长访问}
+
+每个线程以线程ID tid为索引，以s为步长从数组中访问一个32位字是一个常见的模式:
+\begin{lstlisting}
+extern __shared__ float shared[];
+float data = shared[BaseIndex + s * tid];
+\end{lstlisting}
+
+这种情况下，当$s*n$是存储体数的倍数时，线程tid和tid+n访问同一存储体，或等价地，当n是16/d的整数倍时，其中d是16和n的最大公约数。因此，只有半束长度小于等于16/d时没有存储体冲突，此时只有d=1，也就是说s是奇数。
+
+\ref{fig:stridesmemaccess}为计算能力3.0的设备展示的一些按步长访问的例子。这些例子对于计算能力1.x的设备同样有效，但是存储体数目是16而不是32。另外对于计算能力1.x的设备中间例子的访问模式会产生2路冲突。
+\begin{figure}[htbp]
+\centering
+\includegraphics[bb=0 0 351 521]{figures/examples-of-strided-shared-memory-accesses.png}
+\caption{按步长访问共享存储器}
+\label{fig:stridesmemaccess}
+\end{figure}
+
+\subsubsection{32位广播访问}
+
+共享存储器有个特性是广播机制，因此当响应读请求的时候，一个32位字能够被读取并同时广播给多个线程。当多个线程读同一32位字的地址时，减少了存储体冲突的数量。更精确地，由多个地址组成的一次存储体读请求的响应由多个步骤组成，每一个步骤响应一次没有冲突的访问，直至所有的请求被响应；在每一步骤，通过下列过程从剩下的地址中建立访问子集：
+\begin{itemize}
+\item 从尚未访问的地址所指向的字中，选择一个作为广播字；
+\item 子集包括:
+\begin{itemize}
+\item 在广播字内的所有地址，
+\item 剩下地址指向的存储体中，每个存储体（不包括广播存储体）的一个地址。
+\end{itemize}
+\end{itemize}
+在每个周期内，那个字被选为广播字和为每个存储体选择的地址没有定义。
+
+一个常见的没有存储体冲突的例子是当半束内所有线程从同一32位字的一个地址中读时。
+
+\ref{fig:irregularsmemaccess}展示了有关广播机制的一些存储体读访问的例子。这些例子对于计算能力1.x的设备同样有效，但是存储体数目是16而非32.
+\begin{figure}[htbp]
+\centering
+\includegraphics[bb=0 0 348 526]{figures/examples-of-irregular-shared-memory-accesses.png}
+\caption{不规则的共享存储器访问}
+\label{fig:irregularsmemaccess}
+\end{figure}
+
+\subsubsection{8位和16位访问}
+
+8位和16位访问典型地会产生存储体冲突。例如，如果一个char数组以下面的方式访问就会有存储体冲突：
+
+\begin{lstlisting}
+extern __shared__ float shared[];
+char data = shared[BaseIndex + tid];
+\end{lstlisting}
+
+因为shared[0],shared[1],shared[2]和shared[3]在同一存储体中。如果以下面的方式访问，就没有存储体冲突：
+
+\begin{lstlisting}
+char data = shared[BaseIndex + 4 * tid];
+\end{lstlisting}
+
+\subsubsection{大于32位访问}
+
+每个线程大于32位访问会被拆成32位的访问，这典型的会产生存储体冲突。
+
+例如，如下的对double数组的访问会产生2路存储体冲突：
+
+\begin{lstlisting}
+extern __shared__ float shared[];
+double data = shared[BaseIndex + tid];
+\end{lstlisting}
+
+
+由于存储器请求被编译成2个独立的步长为2的32位访问。一种避免存储体冲突的方式是将double操作数拆成两个，就像下面的代码一样：
+
+\begin{lstlisting}
+__shared__ int shared_lo[32];
+__shared__ int shared_hi[32];
+
+double dataIn;
+shared_lo[BaseIndex + tid] = __double2loint(dataIn);
+shared_hi[BaseIndex + tid] = __double2hiint(dataIn);
+
+double dataOut =
+            __hiloint2double(shared_hi[BaseIndex + tid],
+                             shared_lo[BaseIndex + tid]);
+\end{lstlisting}
+
+这可能并不能提高性能，在计算能力2.x及以上的设备上这确实会降低性能。
+
+对于结构体同样有效。如下面的代码：
+
+\begin{lstlisting}
+extern __shared__ float shared[];
+struct type data = shared[BaseIndex + tid];
+\end{lstlisting}
+
+导致：
+\begin{itemize}
+\item 三次独立的没有存储体冲突的访问，如果type定义为：
+\begin{lstlisting}
+struct type {
+	float x, y, z;
+};
+\end{lstlisting}
+因为每个成员以奇数步长被访问，步长是3个32位字：
+\item 两个独立的有存储体冲突的访问，如果type定义为
+\begin{lstlisting}
+struct type {
+    float x, y;
+};
+\end{lstlisting}
+\end{itemize}
+
+因为每个成员以偶数步长被访问，步长是2个32位字。
+
+
+\section{计算能力2.x}
+\label{sec:cc2x}
+
+\subsection{架构}
+
+对于计算能力2.x的设备，一个多处理器包含：
+\begin{itemize}
+\item 对于计算能力2.0的设备：
+\begin{itemize}
+	\item 32个CUDA核心用于整形和浮点算术操作，
+	\item 4个特殊函数单元用于单精度浮点超越函数，
+\end{itemize}
+\item 对于计算能力2.1的设备：
+\begin{itemize}
+	\item 48个CUDA核心用于整形和浮点算术操作，
+	\item 8个特殊函数单元用于单精度浮点超越函数，
+\end{itemize}
+\item 2个线程束调度器。
+在每个指令发射时间，每一个束调度器发射：
+\begin{itemize}
+\item 为计算能力2.0的设备发射一条指令，
+\item 为计算能力2.1的设备发射两条指令。
+\end{itemize}
+\end{itemize}
+如果存在已准备好执行的线程束，第一个束调度器负责奇数ID的束且第二个束调度器负责偶数ID的束。唯一的例外是一个束调度器发射一个双精度指令，此时，另一个调度器不能发射任何指令。
+
+一个线程束调度器只能为多处理器（multiprocessor）内的一半CUDA核心（CUDA Core）服务。为了为束内所有线程执行一条指令，束调度器必须为整数或浮点算术指令在2个时钟周期发射指令。
+
+每个多处理器也有一个只读的一致的缓存，该缓存被所有功能单元共享，且能够加速从常量存储器空间的读取，常量存储器在设备存储器上。
+
+每个多处理器有一级缓存，所有多处理器共享二级缓存，二者都用于缓存全局或本地的访问，包括临时寄存器溢出。缓存行为（如读是缓存在L1和L2还是只缓存在L2）能够基于访问使用读写指令修饰符部分配置。
+
+同一片上存储器同时用于L1和共享存储器：可以配置为48KB的共享存储器和16KB L1缓存（默认设置）或者16KB共享存储器和48KB L1缓存，设置使用cudaFuncSetCacheConfig()函数或cuFuncSetCacheConfig()函数：
+
+\begin{lstlisting}
+      // Device code
+      __global__ void MyKernel(int* foo, int* bar, int a)
+      {
+      ...
+      }
+
+
+      // Host code
+
+      // Runtime API
+      // cudaFuncCachePreferShared: shared memory is 48 KB
+      // cudaFuncCachePreferL1: shared memory is 16 KB
+      // cudaFuncCachePreferNone: no preference
+      cudaFuncSetCacheConfig(MyKernel, cudaFuncCachePreferShared)
+
+      // Or via a function pointer:
+      void (*funcPtr)(int*, int*, int);
+      funcPtr = MyKernel;
+      cudaFuncSetCacheConfig(*funcPtr, cudaFuncCachePreferShared);
+\end{lstlisting}
+
+默认缓存配置没有偏好，如果内核配置为没有偏好，由当前线程/上下文的配置决定。当前线程/上下文的配置可用cudaDeviceSetCacheConfig()/cuCtx-SetCacheConfig()设置（详见参考手册）。如果它们也没有偏好（采用默认设置），此时选择最近使用最多的配置，除非需要改变缓存配置以启动内核（如由于共享存储器的要求）。初始配置是48KB共享存储器和16KB 一级缓存。
+
+应用可能查询二级缓存的大小，这可检查设备的l2CacheSize属性（参见\ref{sec:deviceemu}）。二级缓存最大为768KB。
+
+多处理器组成图形处理器群（GPC)。每个GPC包含4个多处理器。
+
+每个多处理器有一个只读纹理缓存以加速读取纹理存储器空间，纹理存储器在设备存储器上。通过纹理单元访问纹理缓存，纹理单元实现了多种寻址模式和数据滤波，这些在\ref{sec:textureAndSurfacemem}说明。
+
+\subsection{全局存储器}
+\label{sec:gmemcc2x}
+全局存储器访问被缓存。使用编译器选项-dlcm标签，在编译时配置是在L1和L2都缓存（Xptxas -dlcm=ca）或只在L2中缓存（-Xptxas -dlcm=cg）。
+
+缓存线是128字节且映射到设备存储器中一个128字节对齐的段。缓存到一级和二级缓存的存储器访问使用128 字节的存储器事务而只缓存到二级缓存的存储器访问使用32字节的存储器事务。万一存储器访问分散，只缓存到二级缓存能够减少过度读取。
+
+如果每个线程访问的字的尺寸大于4字节，束的存储器访问首先被拆成独立的128字节的存储器请求独立发射：
+\begin{itemize}
+\item 如果尺寸是8字节，拆成两个请求，每个请求负责半束，
+\item 如果尺寸是16字节，拆成四个请求，每个请求负责四分之一束。
+\end{itemize}
+
+每个存储器请求分解成缓存线请求独立发射。如果缓存命中，请求的吞吐量就是L1或L2的吞吐量，否则吞吐量是设备存储器的吞吐量。
+
+注意线程能够以任何顺序访问任何字，包括同一个字。
+
+如果束执行非原子指令为束内多个线程写入全局存储器的同一位置，只有一个线程进行了写操作且那个线程执行没有定义。
+
+\ref{fig:globalmemaccess}展示了一些基于计算能力的全局存储器访问的例子。
+
+\subsection{共享存储器}
+
+共享存储器有32个存储体，存储体的组织使得相邻的32位字被分配到相邻的存储体中。每个存储体带宽为每2个时钟周期32位字。因此不像低计算能力的设备，前半束内的线程和后半束的线程可能发生存储体冲突。
+
+如果多个线程访问属于同一存储体的不同的32位字的任何字节，就发生了存储体冲突。如果多个线程访问同一32位字的任何字节，不会发生存储体冲突：对于读，字会广播给请求线程（不像计算能力1.x的设备，多个字可在一次事务中广播）；对于写，每个字节只会被线程中的一个写（那个线程执行没有定义）。
+
+特别地，这意味着不像计算能力1.x的设备，如下的方式访问char数组没有存储体冲突：
+
+\begin{lstlisting}
+extern __shared__ float shared[];
+char data = shared[BaseIndex + tid];
+\end{lstlisting}
+
+同样，和计算能力1.x的设备不同的有，束的前一半和后一半的线程访问共享存储器可能存在存储体冲突。
+
+\subsubsection{32位步长访问}
+
+一个常见的访问模式是每个线程以线程ID作为索引，s作为步长来访问来自数组的一个32位字：
+\begin{lstlisting}
+extern __shared__ float shared[];
+float data = shared[BaseIndex + s * tid];
+\end{lstlisting}
+
+在这个例子中，当s*n是存储体数量的倍数时，线程tid和tid+n访问同一存储体或者等价地，当n是32/d的倍数时，其中d是32和s的最大公约数。因此只有束尺寸小于等于32/d，d只有等于1，也是说s是奇数。
+
+\ref{fig:stridesmemaccess}展示计算能力3.x的设备上，以某些步长访问共享存储器的例子。它们同样适用于计算能力2.x。但是对于计算能力2.x的设备，中间例子的访问模式会产生2路存储器冲突。
+
+\subsubsection{大于32位访问}
+
+64位和128位访问 被特殊处理以最小化存储体冲突，细节如下。
+
+其它大于32位的访问被拆成32位，64位或128位访问。下面的代码：
+
+\begin{lstlisting}
+struct type {
+       float x, y, z;
+};
+
+extern __shared__ float shared[];
+struct type data = shared[BaseIndex + tid];
+\end{lstlisting}
+
+导致三个独立的没有存储体冲突的32位读，因为每个成员以三个32位字为步长被访问。
+
+对于64位访问，存储体冲突只发生在半束中的两个或多个线程访问同一存储体的不同地址。
+
+不像计算能力1.x的设备，像下面的方式访问double数组不会产生存储体冲突：
+\begin{lstlisting}
+extern __shared__ float shared[];
+double data = shared[BaseIndex + tid];
+\end{lstlisting}
+
+大多数128位访问会引起2路存储体冲突，即使四分之一束没有两个线程访问同一存储体中的不同地址。因此为了确定存储体冲突的数目，必须加1到四分之一束中属于同一存储体的访问不同地址的数目。
+
+\subsection{常量存储器}
+
+除了常量存储器空间得到所有计算能力设备的支持外（{\_}{\_}constant{\_}{\_}声明的变量存储位置），计算能力2.x的设备支持LDU指令，编译器使用LDU指令装载变量：
+\begin{itemize}
+\item 指向全局存储器，
+\item 在内核中只读（程序员可以使用const关键字保证这一点），
+\item 不依赖线程ID.
+\end{itemize}
+
+\section{计算能力3.x}
+\label{sec:cc3x}
+
+\subsection{架构}
+一个多处理器包含：
+\begin{itemize}
+\item 192个用于算术操作的CUDA核，
+\item 32个用于单精度浮点超越函数的特殊函数单元，
+\item 4个束调度器。
+\end{itemize}
+
+当多处理器得到束执行时，它首先将束分发到4个调度器上。然后，在每个指令发射期，每个调度器发射两条独立指令到分配给它且准备好执行的束。
+
+流多处理器有一个由各功能单元共享的只读常量缓存，该缓存加速来自常量存储器空间的读，常量存储器空间存在于设备存储器中。
+
+每个多处理器有一级缓存，所有多处理器共享二级缓存，二者都用于缓存全局或本地存储器的访问，包括临时寄存器溢出。缓存行为（如读是缓存在L1和L2还是只缓存在L2）能够基于访问使用读写指令修饰符部分配置。
+
+同一片上存储器同时用于L1和共享存储器：可以配置为48KB的共享存储器和16KB L1缓存（默认设置）或者16KB共享存储器和48KB L1缓存，设置使用cudaFuncSetCacheConfig()函数或cuFuncSetCacheConfig()函数：
+
+\begin{lstlisting}
+// Device code
+__global__ void MyKernel()
+{
+    ...
+}
+
+// Host code
+
+// Runtime API
+// cudaFuncCachePreferShared: shared memory is 48 KB
+// cudaFuncCachePreferEqual: shared memory is 32 KB
+// cudaFuncCachePreferL1: shared memory is 16 KB
+// cudaFuncCachePreferNone: no preference
+cudaFuncSetCacheConfig(MyKernel, cudaFuncCachePreferShared)
+\end{lstlisting}
+
+默认缓存配置没有偏好，如果内核配置为没有偏好，由当前线程/上下文的配置决定。当前线程/上下文的配置可用cudaDeviceSetCacheConfig()/cuCtx-SetCacheConfig()设置（详见参考手册）。如果它们也没有偏好（采用默认设置），此时选择最近使用最多的配置，除非需要改变缓存配置以启动内核（如由于共享存储器的要求）。初始配置是48KB共享存储器和16KB 一级缓存。
+
+应用可能查询二级缓存的大小，这可检查设备的l2CacheSize属性（参见\ref{sec:deviceemu}）。二级缓存最大为1.5MB。
+
+多处理器组成图形处理器群（GPC)。每个GPC包含3个多处理器。
+
+每个多处理器有一个48KB的只读数据缓存以加速读取纹理存储器空间。多处理器或直接访问（只适用于计算能力3.5的设备），或通过纹理单元。纹理单元实现了多种寻址模式和数据滤波，这些在\ref{sec:textureAndSurfacemem}说明。当通过纹理单元访问时，这只读数据缓存也被称为纹理缓存。
+
+\subsection{全局存储器访问}
+
+对于计算能力3.x的设备来说，全局存储器访问只被缓存到二级缓存，也有可能被缓存到只读数据缓存；但不会缓存到一级缓存。
+
+缓存到二级缓存的行为和计算能力2.x的设备一致（参见\ref{sec:gmemcc2x}）。
+
+编译器确定某个给定的全局存储器读是否缓存到只读数据缓存。要使全局存储器读被缓存到只读数据缓存，要求数据必须是只读的。为了允许编译器确定条件满足，用于加载数据的指针应该使用const \_\_restrict\_\_修饰。
+
+\ref{fig:globalmemaccess}基于计算能力展示了一些全局存储器访问的例子。
+
+\subsection{共享存储器}
+
+共享存储器有32个存储体，两种寻址模式，如下所述。
+
+寻址模式可能使用cudaDeviceGetSharedMemConfig()查询，还可通过cudaDe-viceSetSharedMemConfig()设置。每个存储器的带宽是每个时钟64位。
+
+\ref{fig:stridesmemaccess}展示了一些按步长访问的例子。
+
+\ref{fig:irregularsmemaccess}展示了一些有关广播机制的共享存储器读访问。
+
+\subsubsection{64位模式}
+
+相邻的64位字映射到相邻的存储体。
+
+一个束的两个线程访问共享存储器64位字的任何子字都不会产生存储器冲突。在这种情况下，对于读，64位字会被广播到发起访存请求的线程；对于写，每一个子字都会只会被一个线程写（具体由那个线程写，不确定）。
+
+这种模式，相同的64位访问模式相比计算能力2.x的设备会产生更少的存储体冲突，对于32位访问，相同和更少。
+
+\subsubsection{32位模式}
+
+相邻的32位字映射到相邻的存储体。
+
+一个束的两个线程访问共享存储器32位字的任何子字都不会产生存储器冲突，或者访问地址在同一个对齐的64个字的段（即段的首索引是64的倍数）中的两个32位字。在这种情况下，对于读，32位字会被广播到发起访存请求的线程；对于写，每一个子字都会只会被一个线程写（具体由那个线程写，不确定）。
+
+这种模式，相同的64位访问模式相比计算能力2.x的设备会产生相同或更少的存储体冲突。

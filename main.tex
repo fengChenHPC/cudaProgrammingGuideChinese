@@ -1,0 +1,120 @@
+%% Thesis Template of Chinese Academy of Sciences
+%%   for using CASthesis package with LaTeX2e
+%%
+%% Created by Ling-Yun Wu <aloft@ctex.org>
+%%
+%% $Id: template.tex,v 1.10 2007/01/09 05:10:46 aloft Exp $
+
+
+\documentclass[notypeinfo]{CASthesis}
+% 可选参数：
+% notypeinfo 取消扉页的LaTeX版本信息
+%
+% 下面三个选一个：
+% dvipdfm 使用 dvipdfm(x) 生成最终的 PDF 文档 (缺省设置）
+% dvips 使用 dvips 生成最终的 PS 文档
+% pdftex 使用 pdfLaTeX 生成最终的 PDF 文档
+
+
+% 设置图形文件的搜索路径
+%\graphicspath{{chapter/}{figures/}}
+
+% 取消链接的颜色（黑白打印时）
+%\hypersetup{colorlinks=false}
+
+% 小节标题靠左对齐
+%\CTEXsetup[format+={\flushleft}]{section}
+
+\usepackage{graphics}
+\usepackage{listings}
+\usepackage{longtable}
+\usepackage{tabularx}
+\usepackage{longtable}
+
+\setcounter{tocdepth}{4}
+
+\begin{document}
+
+\lstset{language=C++,
+breaklines=true,
+fontadjust,
+captionpos=t,
+framextopmargin=2pt,framexbottommargin=2pt,abovecaptionskip=-3pt,belowcaptionskip=3pt,
+xleftmargin=1em,xrightmargin=1em, % 设定listing左右的空白
+texcl=true,
+% 设定中文冲突，断行，列模式，数学环境输入，listing数字的样式
+extendedchars=false,columns=flexible,mathescape=true,
+frame=shadowbox
+}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% 封面部分
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+  % 中文封面内容
+  \title{CUDA编程指南5.0中文版}
+  \author{风辰}
+ % \today
+  % 封面
+  \maketitle
+%\makeenglishtitle
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% 前言部分
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\frontmatter
+
+  % 摘要
+  %\include{chapter/abstract}
+
+  %\include{chapter/0perface}
+
+  % 目录
+  \tableofcontents
+  % 表格目录
+  \listoftables
+  % 插图目录
+  \listoffigures
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% 正文部分
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\mainmatter
+
+  \include{chapter/1introduction}
+  \include{chapter/2programmingModel}
+  \include{chapter/3programmingInterface}
+  \include{chapter/4hardwareImplementation}
+  \include{chapter/5performanceGuideline}
+
+%\include{chapter/partAppendix}
+  % 附录
+  \appendix
+  \include{chapter/appendixA-cudaGPU}
+  \include{chapter/appendixB-CExtension}
+  \include{chapter/appendixC-mathFunction}
+  \include{chapter/appendixD-C++}
+  \include{chapter/appendixE-textureFetch}
+  \include{chapter/appendixF-cc}
+  \include{chapter/appendixG-driverAPI}
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% 附件部分
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\backmatter
+
+  % 参考文献
+  % \include{chapter/bib}
+
+  % 发表文章目录
+  %\include{chapter/pub}
+
+  % 个人简历
+ % \include{chapter/resume}
+
+  % 致谢
+  %\include{chapter/thanks}
+
+
+\end{document}

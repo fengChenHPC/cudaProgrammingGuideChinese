@@ -1,0 +1,445 @@
+\chapter{数学函数}
+\label{sec:mathfunction}
+参考手册列举了所有设备代码支持的C/C++标准库的数学函数和其描述，及内置函数（它们只能在设备代码中使用)。
+
+本附录提供了这些函数中部分函数的精度信息。
+
+\section{标准函数}
+\label{sec:standardfunction}
+本节的函数既可用于主机代码也可用于设备代码。
+
+此节指出各函数在设备上执行时的误差范围。当函数在主机上执行，而主机并未提供此函数时，误差范围同样适用。
+
+这里列举的误差范围经过了广泛的测试，但并没有穷尽测试，所以不能保证没有偏差。
+
+\subsection{单精度浮点函数}
+\label{sec:floatpointstandard}
+加法和乘法是符合 IEEE 的，因此误差最多为 0.5 ulp。但编译器往往将其整合为一个单独的乘加指令（FMAD），在计算能力1.x的设备上，FMAD截取乘法的中间结果(参见\ref{sec:floatpointstandard})。可通过使用 {\_}fadd{\_}rn() 和 {\_}fmul{\_}rn() 函数来避免这样的整合（请参见\ref{sec:intrinsic}）。
+
+要将单精度浮点操作数舍入为整型，而使结果为单精度浮点数，推荐的方法是使用 rintf() 而非 roundf()。原因在于 roundf() 会映射到设备上的一个 8 指令序列，而 rintf() 只映射到一条指令。truncf()、ceilf() 和 floorf() 均可映射到一条指令。
+
+\begin{longtable}{|p{100pt}|p{300pt}|}
+\caption{数学标准库函数及其最大 ULP 错误。最大错误表示为正确舍入的单精度结果和 CUDA 库函数返回的结果之差（以 ulp 计算）的绝对值}\\
+\hline
+\textbf{函数}& \textbf{最大 ulp 错误} \\
+\hline
+x+y & （IEEE-754 就近舍入到最近偶数）\par（在计算能力1.x设备上，加法合并成 FMAD 时除外） \\
+\hline
+x*y& （IEEE-754 就近舍入到最近偶数） \par （在计算能力1.x设备上，加法合并成 FMAD 时除外） \\
+\hline
+x/y& 计算能力>=2的设备，使用-prec-div=true编译时，；其它，2（整个范围） \\
+\hline
+1/x& 计算能力>=2的设备，使用-prec-div=true编译时，；其它，1 (整个范围) \\
+\hline
+1/sqrtf(x) \par rsqrtf(x)& 2 (整个范围) \par 只有当它被编译器转化为rsqrtf(x)才应用到1/sqrtf(x) \\
+\hline
+sqrtf(x) & 计算能力>=2的设备，使用-prec-div=true编译时，；其它，3(整个范围) \\
+\hline
+cbrtf(x)& 1(整个范围) \\
+\hline
+rcbrtf(x)& 2(整个范围） \\
+\hline
+hypotf(x,y)& 3(整个范围) \\
+\hline
+expf(x)& 2(整个范围) \\
+\hline
+exp2f(x)& 2(整个范围) \\
+\hline
+exp10f(x)& 2(整个范围) \\
+\hline
+expm1f(x)& 1(整个范围) \\
+\hline
+logf(x)& 1(整个范围) \\
+\hline
+log2f(x)& 3(整个范围) \\
+\hline
+log10f(x)& 3(整个范围) \\
+\hline
+log1pf(x)& 2(整个范围) \\
+\hline
+sinf(x)& 2(整个范围) \\
+\hline
+cosf(x)& 2(整个范围) \\
+\hline
+tanf(x)& 4(整个范围) \\
+\hline
+sincosf(x,sptr,cptr)& 2(整个范围) \\
+\hline
+sinpif(x)& 2(整个范围) \\
+\hline
+cospif(x)& 2(整个范围) \\
+\hline
+sincospif(x, sptr, cptr) & 2(整个范围) \\
+\hline
+asinf(x)& 4(整个范围) \\
+\hline
+acosf(x)& 3(整个范围) \\
+\hline
+atanf(x)& 2(整个范围) \\
+\hline
+atan2f(y,x)& 3(整个范围) \\
+\hline
+sinhf(x)& 3(整个范围) \\
+\hline
+coshf(x)& 2(整个范围) \\
+\hline
+tanhf(x)& 2(整个范围) \\
+\hline
+asinhf(x)& 3(整个范围) \\
+\hline
+acoshf(x)& 4(整个范围) \\
+\hline
+atanhf(x)& 3(整个范围) \\
+\hline
+powf(x,y)& 8(整个范围) \\
+\hline
+erff(x)& 3(整个范围) \\
+\hline
+erfcf(x)& 6(整个范围) \\
+\hline
+erfinvf(x)& 3(整个范围) \\
+\hline
+erfcinvf(x)& 4(整个范围) \\
+\hline
+lgammaf(x)& 6(outside interval-10.001...-2.264;larger inside) \\
+\hline
+tgammaf(x)& 11(整个范围) \\
+\hline
+fmaf(x,y,z)& 0(整个范围) \\
+\hline
+frexpf(x,exp)& 0(整个范围) \\
+\hline
+ldexpf(x,exp)& 0(整个范围) \\
+\hline
+scalbnf(x,n)& 0(整个范围) \\
+\hline
+scalblnf(x,l)& 0(整个范围) \\
+\hline
+logbf(x)& 0(整个范围) \\
+\hline
+ilogbf(x)& 0(整个范围) \\
+\hline
+j0f(x) & $|x|<8$时，9 \par 否则，最大绝对误差为$2.2x10^{-6}$ \\
+\hline
+j1f(x) & $|x|<8$时，9 \par 否则，最大绝对误差为$2.2x10^{-6}$ \\
+\hline
+jnf(x) & 如果n=128，最大绝对误差为$2.2x10^{-6}$ \\
+\hline
+y0f(x) & $|x|<8$时，9 \par 否则，最大绝对误差为$2.2x10^{-6}$ \\
+\hline
+y1f(x) & $|x|<8$时，9 \par 否则，最大绝对误差为$2.2x10^{-6}$ \\
+\hline
+ynf(x) & $|x|<8$时，9 \par 否则，最大绝对误差为$2.2x10^{-6}$ \\
+\hline
+fmodf(x,y)& 0(整个范围) \\
+\hline
+remainderf(x,y)& 0(整个范围) \\
+\hline
+remquof(x,y,iptr)&  0(整个范围) \\
+\hline
+modff(x,iptr)& 0(整个范围) \\
+\hline
+fdimf(x,y)& 0(整个范围) \\
+\hline
+truncf(x)& 0(整个范围) \\
+\hline
+roundf(x)& 0(整个范围) \\
+\hline
+rintf(x)& 0(整个范围) \\
+\hline
+nearbyintf(x)& 0(整个范围) \\
+\hline
+ceilf(x)& 0(整个范围) \\
+\hline
+floorf(x)& 0(整个范围) \\
+\hline
+lrintf(x)& 0(整个范围) \\
+\hline
+lroundf(x)& 0(整个范围) \\
+\hline
+llrintf(x)& 0(整个范围) \\
+\hline
+llroundf(x)& 0(整个范围) \\
+\hline
+\end{longtable}
+
+\subsection{双精度浮点函数}
+\label{sec:doublefunction}
+下面列举的误差仅适用于为具有原生双精度支持的设备编译的情况。在为无此类支持的设备编译时，如计算能力为1.2 或更低的设备，double 类型将默认地降低为float，双精度数学函数将映射为其单精度版本。
+
+要将双精度浮点操作数舍入为整型，而使结果为双精度浮点数，推荐的方法是使用rint()，而不是 round()。原因在于 round() 会映射到设备上的一个 8 指令序列，而rint() 仅映射到一条指令。Trunc()、ceil() 和 floor() 均可映射到一条指令。
+
+\begin{longtable}{|p{100pt}|p{300pt}|}
+\caption{数学标准库函数及其最大 ULP 错误最大错误表示为正确舍入的双精度结果和 CUDA 库函数返回的结果之差 (以ulp 计算)的绝对值}\\
+\hline
+\textbf{函数}& \textbf{最大ulp错误} \\
+\hline
+x+y& 0(IEEE-754舍入到最近的偶数） \\
+\hline
+x*y& 0(IEEE-754舍入到最近的偶数) \\
+\hline
+x/y& 0(IEEE-754舍入到最近的偶数) \\
+\hline
+1/x& 0(IEEE-754舍入到最近的偶数) \\
+\hline
+sqrt(x)& 0 (IEEE-754舍入到最近的偶数) \\
+\hline
+rsqrt(x)& 1(整个范围) \\
+\hline
+cbrt(x)& 1(整个范围) \\
+\hline
+rcbrt(x)& 1(整个范围) \\
+\hline
+hypot(x,y)& 2(整个范围) \\
+\hline
+exp(x)& 1(整个范围) \\
+\hline
+exp2(x)& 1(整个范围) \\
+\hline
+exp10(x)& 1(整个范围) \\
+\hline
+expm1(x)& 1(整个范围) \\
+\hline
+log(x)& 1(整个范围) \\
+\hline
+log2(x)& 1(整个范围) \\
+\hline
+log10(x)& 1(整个范围) \\
+\hline
+log1px(x)& 1(整个范围) \\
+\hline
+sin(x)& 2(整个范围) \\
+\hline
+cos(x)& 2(整个范围) \\
+\hline
+tan(x)& 2(整个范围) \\
+\hline
+sincos(x,sptr,cptr)& 2(整个范围) \\
+\hline
+sinpi(x)& 2(整个范围) \\
+\hline
+cospi(x)& 2(整个范围) \\
+\hline
+sincospi(x, sptr, cptr) & 1(整个范围)\\
+\hline
+asin(x)& 2(整个范围) \\
+\hline
+acos(x)& 2(整个范围) \\
+\hline
+atan(x)& 2(整个范围) \\
+\hline
+atan2(y,x)& 2(整个范围) \\
+\hline
+sinh(x)& 1(整个范围) \\
+\hline
+cosh(x)& 1(整个范围) \\
+\hline
+tanh(x)& 1(整个范围) \\
+\hline
+asinh(x)& 2(整个范围) \\
+\hline
+acosh(x)& 2(整个范围) \\
+\hline
+atanh(x)& 2(整个范围) \\
+\hline
+pow(x,y)& 2(整个范围) \\
+\hline
+erf(x)& 2(整个范围) \\
+\hline
+erfc(x)& 4(整个范围) \\
+\hline
+erfinv(x)& 5(整个范围) \\
+\hline
+erfcinv(x)& 8(整个范围) \\
+\hline
+lgamma(x)& 4(outside interval-11.0001...-2.2637;larger inside) \\
+\hline
+tgamma(x)& 8(整个范围) \\
+\hline
+fma(x,y,z)& 0(IEEE-754 传入到最近的偶数) \\
+\hline
+frexp(x,exp)& 0(整个范围) \\
+\hline
+ldexp(x,exp)& 0(整个范围) \\
+\hline
+scalbn(x,n)& 0(整个范围) \\
+\hline
+scalbln(x,l)& 0(整个范围) \\
+\hline
+logb(x)& 0(整个范围) \\
+\hline
+ilogb(x)& 0(整个范围) \\
+\hline
+j0(x) & $|x|<8$时，7 \par 否则，最大绝对误差为$5x10^{-12}$ \\
+\hline
+j1(x) & $|x|<8$时，7 \par 否则，最大绝对误差为$5x10^{-12}$ \\
+\hline
+jn(x) & 如果n=128，最大绝对误差为$5x10^{-12}$ \\
+\hline
+y0(x) & $|x|<8$时，7 \par 否则，最大绝对误差为$5x10^{-12}$ \\
+\hline
+y1(x) & $|x|<8$时，7 \par 否则，最大绝对误差为$5x10^{-12}$ \\
+\hline
+yn(x) & $|x|<8$时，7 \par 否则，最大绝对误差为$5x10^{-12}$ \\
+\hline
+fmod(x,y)& 0(整个范围) \\
+\hline
+remainder(x,y)& 0(整个范围) \\
+\hline
+remquo(x,y,iptr)& 0(整个范围) \\
+\hline
+mod(x,iptr)& 0(整个范围) \\
+\hline
+fdim(x,y)& 0(整个范围) \\
+\hline
+trunc(x)& 0(整个范围) \\
+\hline
+round(x)& 0(整个范围) \\
+\hline
+rint(x)& 0(整个范围) \\
+\hline
+nearbyint(x)& 0(整个范围) \\
+\hline
+ceil(x)& 0(整个范围) \\
+\hline
+floor(x)& 0(整个范围) \\
+\hline
+lrint(x)& 0(整个范围) \\
+\hline
+lround(x)& 0(整个范围) \\
+\hline
+llrint(x)& 0(整个范围) \\
+\hline
+llround(x)& 0(整个范围) \\
+\hline
+\end{longtable}
+
+\section{内置函数}
+\label{sec:intrinsic}
+这一节列举了仅在设备代码中支持的内置函数。
+
+这些函数中包括\ref{sec:standardfunction}所列函数的精确度较低但速度更快的版本；它们具有相同的名称，另外加上 {\_}{\_} 前缀（如{\_}{\_}sinf(x)）。编译器有个选项(--use-fast-math)强制\ref{tab:intrinsic}的每个函数编译成其对应的内置版本。内置函数除了降低了受影响函数的精度，也可能在某些特殊情况的处理上不同。一种更健壮的方法是在性能提升和性质改变（如精度降低和特殊发问处理）可以容忍的情况下，选择性的将部分函数改成内置版本。
+
+
+\begin{table}[htbp]
+\caption{受-use-fast-math影响的函数}
+\begin{tabular}
+{|p{213pt}|p{213pt}|}
+\hline
+运算符/函数& 设备函数 \\
+\hline
+x/y& {\_}{\_}fdividef(x,y) \\
+\hline
+sinf(x)& {\_}{\_}sinf(x) \\
+\hline
+cosf(x)& {\_}{\_}cosf(x) \\
+\hline
+tanf(x)& {\_}{\_}tanf(x) \\
+\hline
+sincosf(x,sptr, cptr)& {\_}{\_}sincosf(x,sptr,cptr) \\
+\hline
+logf(x)& {\_}{\_}logf(x) \\
+\hline
+log2f(x)& {\_}{\_}log2f(x) \\
+\hline
+log10f(x)& {\_}{\_}log10f(x) \\
+\hline
+expf(x)& {\_}{\_}expf(x) \\
+\hline
+exp10f(x)& {\_}{\_}exp10f(x) \\
+\hline
+powf(x,y)& {\_}{\_}powf(x,y) \\
+\hline
+\end{tabular}
+\label{tab:intrinsic}
+\end{table}
+
+
+使用 {\_}rn 前缀的函数将使用就近舍入到偶数模式操作；
+
+使用 {\_}rz 前缀的函数将使用向零舍入模式操作；
+
+使用 {\_}ru 前缀的函数将使用上舍入（向正无穷大）模式；
+
+使用 {\_}rd 前缀的函数将使用下舍入（向负无穷大）模式。
+
+\subsection{单精度浮点函数}
+
+编译器从未将{\_}fadd{\_}rn() 和 {\_}fmul{\_}rn() 映射的加法和乘法操作并入FMAD 中。与此相比，``*''和``+''运算符生成的加法和乘法将频繁并入 FMADs。
+
+浮点除法的精度依赖于设备的计算能力和代码是以-prec-div=false还是-prec-div=true编译。当代码以-prec-div=false编译时，普通浮点除法和{\_}fdividef(x, y) 具有相同的精确度，但在 $2^{126} < y < 2^{128}$ 时，{\_}fdivedef(x, y) 的结果为 0，而普通除法将在\ref{tab:floatpointintrinsic}列举的精确度内提供正确的结果。同样，在 $2^{126} < y < 2^{128}$ 时，如果 x 是无穷大，{\_} fdivedf(x, y) 将得到结果 NaN（无穷大乘以 0 的结果），而普通除法将返回无穷大。另一方面，以-prec-div=true编译或者不加此选项，在计算能力2.x及以上的设备上，普通除法是符合IEEE标准的。
+
+\begin{table}[htbp]
+\caption{CUDA 运行时库支持的单精度浮点内部函数及其误差范围}
+\begin{tabular}
+{|p{157pt}|p{268pt}|}
+\hline
+\textbf{函数}& \textbf{误差范围} \\
+\hline
+\textbf{{\_}{\_}fadd{\_}[rn,rz,ru,rd](x,y)}& 符合 IEEE \\
+\hline
+\textbf{{\_}{\_}fmul{\_}[rn,rz,ru,rd](x,y)}& 符合 IEEE \\
+\hline
+\textbf{{\_}{\_}fmaf{\_}[rn,rz,ru,rd](x,y,z)}& 符合 IEEE \\
+\hline
+\textbf{{\_}{\_}frcp{\_}[rn,rz,ru,rd](x)}& 符合 IEEE \\
+\hline
+\textbf{{\_}{\_}fsqrt{\_}[rn,rz,ru,rd](x)}& 符合 IEEE \\
+\hline
+\textbf{{\_}{\_}fdiv{\_}[rn,rz,ru,rd](x,y)}& 符合 IEEE \\
+\hline
+\textbf{{\_}{\_}fdividef(x,y)}& 如果 y 在 $[2^{-126}, 2^{126}]$ 区间内，则最大 ulp 误差为 2. \\
+\hline
+\textbf{{\_}{\_}expf(x)}& 最大 ulp 误差为\textbf{2 + floor(abs(1.16 * x))}。 \\
+\hline
+\textbf{{\_}{\_}exp10f(x)}& 最大 ulp 误差为\textbf{2 + floor(abs(2.95 * x))}。 \\
+\hline
+\textbf{{\_}{\_}logf(x)}& 如果 x 在 [0.5, 2] 区间内，则最大绝对误差为 $2^{-21.41}$，否则最大 ulp 误差为 3。 \\
+\hline
+\textbf{{\_}{\_}log2f(x)}& 如果 x 在 [0.5, 2] 区间内，则最大绝对误差为 $2^{-22}$，否则最大 ulp 误差为 2。 \\
+\hline
+\textbf{{\_}{\_}log10f(x)}& 如果 x 在 [0.5, 2] 区间内，则最大绝对误差为 $2^{ -24}$，否则最大 ulp 误差为 3。 \\
+\hline
+\textbf{{\_}{\_}sinf(x)}& 如果 x 在 $[-\pi, \pi]$ 区间内，则最大绝对误差为 $2^{-21.41}$，否则更大。 \\
+\hline
+\textbf{{\_}{\_}cosf(x)}& 如果 x 在 $[-\pi, \pi]$ 区间内，则最大绝对误差为 $2^{-21.19}$，否则更大。 \\
+\hline
+\textbf{{\_}{\_}sincosf(x,sptr,cptr)}& 与 sinf(x) 和 cosf(x) 相同。 \\
+\hline
+\textbf{{\_}{\_}tanf(x)}& 继承自以下实现： \par ${{\_}{\_}sinf(x) x (1 / {\_}{\_}cosf(x))}$。 \\
+\hline
+\textbf{{\_}{\_}powf(x, y)}& 继承自以下实现： \par ${exp2f(y x {\_}{\_}log2f(x))}$。 \\
+\hline
+\end{tabular}
+\label{tab:floatpointintrinsic}
+\end{table}
+
+
+\subsection{双精度浮点函数}
+
+编译器从未将{\_}dadd{\_}rn() 和 {\_}dmul{\_}rn()映射的加法和乘法运算操作并入FMAD。与此相比，``*''和``+''运算符生成的加法和乘法将频繁并入FMADs。
+
+
+\begin{table}[htbp]
+\caption{CUDA 运行时库支持的双精度浮点内置函数及其误差范围}
+\begin{tabular}
+{|p{190pt}|p{219pt}|}
+\hline
+\textbf{函数}& \textbf{误差范围} \\
+\hline
+{\_}{\_}dadd{\_}[rn,rz,ru,rd](x,y)& 符合IEEE \\
+\hline
+{\_}{\_}dmul{\_}[rn,rz,ru,rd](x,y)& 符合IEEE \\
+\hline
+{\_}{\_}fma{\_}[rn,rz,ru,rd](x,y,z)& 符合IEEE \\
+\hline
+{\_}{\_}ddiv{\_}[rn,rz,ru,rd](x,y)(x,y)& 符合IEEE，要求计算能力不小于2.0 \\
+\hline
+{\_}{\_}drcp{\_}[rn,rz,ru,rd](x)& 符合IEEE，要求计算能力不小于2.0 \\
+\hline
+{\_}{\_}dsqrt{\_}[rn,rz,ru,rd](x)& 符合IEEE，要求计算能力不小于2.0 \\
+\hline
+\end{tabular}
+\label{tab:doubleintrinsic}
+\end{table}
+

@@ -1,0 +1,136 @@
+\relax 
+\@writefile{toc}{\contentsline {chapter}{\numberline {第三章\hspace  {0.3em}}编程接口}{15}{chapter.3}}
+\@writefile{lof}{\addvspace {10\p@ }}
+\@writefile{lot}{\addvspace {10\p@ }}
+\newlabel{sec:programInterface}{{三}{15}{编程接口\relax }{chapter.3}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {3.1}用nvcc编译}{15}{section.3.1}}
+\newlabel{sec:nvcccompile}{{3.1}{15}{用nvcc编译\relax }{section.3.1}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.1.1}编译流程}{16}{subsection.3.1.1}}
+\newlabel{sec:compileflow}{{3.1.1}{16}{编译流程\relax }{subsection.3.1.1}{}}
+\@writefile{toc}{\contentsline {subsubsection}{\numberline {3.1.1.1}离线编译}{16}{subsubsection.3.1.1.1}}
+\@writefile{toc}{\contentsline {subsubsection}{\numberline {3.1.1.2}即时编译}{16}{subsubsection.3.1.1.2}}
+\newlabel{sec:justintimecompile}{{3.1.1.2}{16}{即时编译\relax }{subsubsection.3.1.1.2}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.1.2}二进制兼容性}{17}{subsection.3.1.2}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.1.3}PTX兼容性}{17}{subsection.3.1.3}}
+\newlabel{sec:appcompatibility}{{3.1.3}{17}{PTX兼容性\relax }{subsection.3.1.3}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.1.4}应用兼容性}{18}{subsection.3.1.4}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.1.5}C/C++兼容性}{19}{subsection.3.1.5}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.1.6}64位兼容性}{19}{subsection.3.1.6}}
+\@writefile{toc}{\contentsline {section}{\numberline {3.2}CUDA C运行时}{19}{section.3.2}}
+\newlabel{sec:runtime}{{3.2}{19}{CUDA C运行时\relax }{section.3.2}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.2.1}初始化}{20}{subsection.3.2.1}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.2.2}设备存储器}{20}{subsection.3.2.2}}
+\newlabel{sec:devicemem}{{3.2.2}{20}{设备存储器\relax }{subsection.3.2.2}{}}
+\@writefile{lol}{\contentsline {lstlisting}{bookSrc/vecaddtotal.cu}{20}{lstlisting.3.-5}}
+\@writefile{lol}{\contentsline {lstlisting}{bookSrc/loopover2d.cu}{22}{lstlisting.3.-6}}
+\@writefile{lol}{\contentsline {lstlisting}{bookSrc/loopover3d.cu}{23}{lstlisting.3.-7}}
+\@writefile{lol}{\contentsline {lstlisting}{bookSrc/copyconstant.cu}{24}{lstlisting.3.-8}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.2.3}共享存储器}{24}{subsection.3.2.3}}
+\newlabel{sec:shared}{{3.2.3}{24}{共享存储器\relax }{subsection.3.2.3}{}}
+\@writefile{lol}{\contentsline {lstlisting}{bookSrc/mxmwithoutsmem.cu}{25}{lstlisting.3.-9}}
+\@writefile{lol}{\contentsline {lstlisting}{bookSrc/mxmwithsmem.cu}{27}{lstlisting.3.-10}}
+\@writefile{lof}{\contentsline {figure}{\numberline {3.1}{\ignorespaces 没有共享存储器的矩阵相乘}}{28}{figure.3.1}}
+\newlabel{fig:mxmwithoutsmem}{{3.1}{28}{没有共享存储器的矩阵相乘\relax }{figure.3.1}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.2.4}分页锁定主机存储器}{32}{subsection.3.2.4}}
+\newlabel{sec:pagelocked}{{3.2.4}{32}{分页锁定主机存储器\relax }{subsection.3.2.4}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {3.2}{\ignorespaces 使用共享存储器的矩阵相乘}}{33}{figure.3.2}}
+\newlabel{fig:mxmwithsmem}{{3.2}{33}{使用共享存储器的矩阵相乘\relax }{figure.3.2}{}}
+\@writefile{toc}{\contentsline {subsubsection}{\numberline {3.2.4.1}可分享存储器(portable memory)}{34}{subsubsection.3.2.4.1}}
+\newlabel{sec:portablemem}{{3.2.4.1}{34}{可分享存储器(portable memory)\relax }{subsubsection.3.2.4.1}{}}
+\@writefile{toc}{\contentsline {subsubsection}{\numberline {3.2.4.2}写结合存储器}{34}{subsubsection.3.2.4.2}}
+\newlabel{sec:writecombined}{{3.2.4.2}{34}{写结合存储器\relax }{subsubsection.3.2.4.2}{}}
+\@writefile{toc}{\contentsline {subsubsection}{\numberline {3.2.4.3}被映射存储器}{34}{subsubsection.3.2.4.3}}
+\newlabel{sec:mappedmem}{{3.2.4.3}{34}{被映射存储器\relax }{subsubsection.3.2.4.3}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.2.5}异步并发执行}{35}{subsection.3.2.5}}
+\newlabel{sec:asynchronizedconcurentexecution}{{3.2.5}{35}{异步并发执行\relax }{subsection.3.2.5}{}}
+\@writefile{toc}{\contentsline {subsubsection}{\numberline {3.2.5.1}主机和设备间异步执行}{35}{subsubsection.3.2.5.1}}
+\@writefile{toc}{\contentsline {subsubsection}{\numberline {3.2.5.2}数据传输和内核执行重叠}{36}{subsubsection.3.2.5.2}}
+\newlabel{sec:overlapTransferAndKernels}{{3.2.5.2}{36}{数据传输和内核执行重叠\relax }{subsubsection.3.2.5.2}{}}
+\@writefile{toc}{\contentsline {subsubsection}{\numberline {3.2.5.3}并发内核执行}{36}{subsubsection.3.2.5.3}}
+\newlabel{sec:concurrentKernels}{{3.2.5.3}{36}{并发内核执行\relax }{subsubsection.3.2.5.3}{}}
+\@writefile{toc}{\contentsline {subsubsection}{\numberline {3.2.5.4}并发数据传输}{37}{subsubsection.3.2.5.4}}
+\newlabel{sec:concurrentTransfer}{{3.2.5.4}{37}{并发数据传输\relax }{subsubsection.3.2.5.4}{}}
+\@writefile{toc}{\contentsline {subsubsection}{\numberline {3.2.5.5}流}{37}{subsubsection.3.2.5.5}}
+\newlabel{sec:stream}{{3.2.5.5}{37}{流\relax }{subsubsection.3.2.5.5}{}}
+\newlabel{sec:streamCreateAndDestroy}{{3.2.5.5}{37}{流\relax }{subsubsection.3.2.5.5}{}}
+\newlabel{sec:defaultstream}{{3.2.5.5}{38}{流\relax }{lstnumber.-13.2}{}}
+\newlabel{sec:overlapbehavior}{{3.2.5.5}{39}{流\relax }{lstnumber.-13.2}{}}
+\@writefile{toc}{\contentsline {subsubsection}{\numberline {3.2.5.6}事件}{41}{subsubsection.3.2.5.6}}
+\@writefile{toc}{\contentsline {subsubsection}{\numberline {3.2.5.7}同步调用}{42}{subsubsection.3.2.5.7}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.2.6}多设备系统}{42}{subsection.3.2.6}}
+\newlabel{sec:deviceemu}{{3.2.6}{42}{多设备系统\relax }{subsection.3.2.6}{}}
+\@writefile{toc}{\contentsline {subsubsection}{\numberline {3.2.6.1}枚举设备}{42}{subsubsection.3.2.6.1}}
+\@writefile{toc}{\contentsline {subsubsection}{\numberline {3.2.6.2}设备指定}{43}{subsubsection.3.2.6.2}}
+\@writefile{toc}{\contentsline {subsubsection}{\numberline {3.2.6.3}流和事件行为}{43}{subsubsection.3.2.6.3}}
+\@writefile{toc}{\contentsline {subsubsection}{\numberline {3.2.6.4}p2p存储器访问}{44}{subsubsection.3.2.6.4}}
+\@writefile{toc}{\contentsline {subsubsection}{\numberline {3.2.6.5}p2p存储器复制}{45}{subsubsection.3.2.6.5}}
+\@writefile{toc}{\contentsline {subsubsection}{\numberline {3.2.6.6}统一虚拟地址空间}{46}{subsubsection.3.2.6.6}}
+\newlabel{sec:unifiedAddressing}{{3.2.6.6}{46}{统一虚拟地址空间\relax }{subsubsection.3.2.6.6}{}}
+\@writefile{toc}{\contentsline {subsubsection}{\numberline {3.2.6.7}错误检查}{46}{subsubsection.3.2.6.7}}
+\newlabel{sec:errorchecking}{{3.2.6.7}{46}{错误检查\relax }{subsubsection.3.2.6.7}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.2.7}调用栈}{47}{subsection.3.2.7}}
+\newlabel{sec:callstack}{{3.2.7}{47}{调用栈\relax }{subsection.3.2.7}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.2.8}纹理和表面存储器}{47}{subsection.3.2.8}}
+\newlabel{sec:textureAndSurfacemem}{{3.2.8}{47}{纹理和表面存储器\relax }{subsection.3.2.8}{}}
+\@writefile{toc}{\contentsline {subsubsection}{\numberline {3.2.8.1}纹理存储器}{48}{subsubsection.3.2.8.1}}
+\newlabel{sec:texturemem}{{3.2.8.1}{48}{纹理存储器\relax }{subsubsection.3.2.8.1}{}}
+\newlabel{sec:textureObj}{{3.2.8.1}{49}{纹理存储器\relax }{subsubsection.3.2.8.1}{}}
+\@writefile{lol}{\contentsline {lstlisting}{bookSrc/texobjecttran.cu}{50}{lstlisting.3.-25}}
+\newlabel{sec:textureReference}{{3.2.8.1}{53}{纹理存储器\relax }{lstnumber.-25.79}{}}
+\@writefile{lol}{\contentsline {lstlisting}{bookSrc/texreftran.cu}{56}{lstlisting.3.-33}}
+\newlabel{tab:cubemap}{{3.2.8.1}{59}{纹理存储器\relax }{lstnumber.-33.68}{}}
+\@writefile{toc}{\contentsline {subsubsection}{\numberline {3.2.8.2}表面存储器(surface)}{60}{subsubsection.3.2.8.2}}
+\newlabel{sec:surfacemem}{{3.2.8.2}{60}{表面存储器(surface)\relax }{subsubsection.3.2.8.2}{}}
+\@writefile{lol}{\contentsline {lstlisting}{bookSrc/surfobjtran.cu}{60}{lstlisting.3.-34}}
+\@writefile{lol}{\contentsline {lstlisting}{bookSrc/surfreftran.cu}{64}{lstlisting.3.-38}}
+\@writefile{toc}{\contentsline {subsubsection}{\numberline {3.2.8.3}CUDA 数组}{66}{subsubsection.3.2.8.3}}
+\@writefile{toc}{\contentsline {subsubsection}{\numberline {3.2.8.4}读写一致性}{66}{subsubsection.3.2.8.4}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.2.9}图形学互操作性}{66}{subsection.3.2.9}}
+\newlabel{sec:graphicsop}{{3.2.9}{66}{图形学互操作性\relax }{subsection.3.2.9}{}}
+\@writefile{toc}{\contentsline {subsubsection}{\numberline {3.2.9.1}OpenGL互操作性}{67}{subsubsection.3.2.9.1}}
+\newlabel{sec:openglop}{{3.2.9.1}{67}{OpenGL互操作性\relax }{subsubsection.3.2.9.1}{}}
+\@writefile{lol}{\contentsline {lstlisting}{bookSrc/openglop.cu}{68}{lstlisting.3.-39}}
+\@writefile{toc}{\contentsline {subsubsection}{\numberline {3.2.9.2}Direct3D互操作性}{71}{subsubsection.3.2.9.2}}
+\newlabel{sec:d3dop}{{3.2.9.2}{71}{Direct3D互操作性\relax }{subsubsection.3.2.9.2}{}}
+\@writefile{lol}{\contentsline {lstlisting}{bookSrc/d3d9op.cu}{72}{lstlisting.3.-40}}
+\@writefile{lol}{\contentsline {lstlisting}{bookSrc/d3d10op.cu}{75}{lstlisting.3.-41}}
+\@writefile{lol}{\contentsline {lstlisting}{bookSrc/d3d11op.cu}{79}{lstlisting.3.-42}}
+\@writefile{toc}{\contentsline {subsubsection}{\numberline {3.2.9.3}SLI（速力）互操作性}{82}{subsubsection.3.2.9.3}}
+\newlabel{sec:sliop}{{3.2.9.3}{82}{SLI（速力）互操作性\relax }{subsubsection.3.2.9.3}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {3.3}版本和兼容性}{83}{section.3.3}}
+\@writefile{lof}{\contentsline {figure}{\numberline {3.3}{\ignorespaces 驱动API是向后兼容，而非向前兼容}}{84}{figure.3.3}}
+\newlabel{fig:cocv}{{3.3}{84}{驱动API是向后兼容，而非向前兼容\relax }{figure.3.3}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {3.4}计算模式}{84}{section.3.4}}
+\@writefile{toc}{\contentsline {section}{\numberline {3.5}模式切换}{85}{section.3.5}}
+\@writefile{toc}{\contentsline {section}{\numberline {3.6}Windows上的Tesla计算集群模式}{85}{section.3.6}}
+\@setckpt{chapter/3programmingInterface}{
+\setcounter{page}{86}
+\setcounter{equation}{0}
+\setcounter{enumi}{0}
+\setcounter{enumii}{0}
+\setcounter{enumiii}{0}
+\setcounter{enumiv}{0}
+\setcounter{footnote}{0}
+\setcounter{mpfootnote}{0}
+\setcounter{CTEX@sectiondepth}{2}
+\setcounter{part}{0}
+\setcounter{chapter}{3}
+\setcounter{section}{6}
+\setcounter{subsection}{0}
+\setcounter{subsubsection}{3}
+\setcounter{paragraph}{0}
+\setcounter{subparagraph}{0}
+\setcounter{figure}{3}
+\setcounter{table}{0}
+\setcounter{parentequation}{0}
+\setcounter{NAT@ctr}{0}
+\setcounter{Item}{0}
+\setcounter{Hfootnote}{0}
+\setcounter{Hy@AnnotLevel}{0}
+\setcounter{bookmark@seq@number}{60}
+\setcounter{lstnumber}{117}
+\setcounter{LT@tables}{0}
+\setcounter{LT@chunks}{0}
+\setcounter{section@level}{1}
+\setcounter{lstlisting}{0}
+}

@@ -1,0 +1,1076 @@
+\chapter{编程接口}
+\label{sec:programInterface}
+
+CUDA C向熟悉C语言的用户提供了一种编写设备上执行的代码的简单路径。
+
+CUDA C包括C的最小扩展集和一个运行时库。
+
+\ref{sec:programModel}已经介绍了语言的核心扩展，这些扩展允许程序员像定义C函数一样定义内核和在每次内核调用时使用新的语法指定网格和块的尺寸。\ref{sec:cextension}提供了所有扩展的详尽描述。任何包含某些扩展的源文件必须使用nvcc 编译，如使用nvcc编译节指出那样。
+
+\ref{sec:runtime}介绍运行时API，运行时API在主机上执行，它提供了分配和释放设备存储器、在主机和显存间传输数据、管理多设备的系统的函数等等。详尽的描述请查看CUDA参考手册。
+
+运行时API是基于驱动API构建的，应用也可以访问驱动API。驱动API通过展示低层的概念提供了额外的控制，如CUDA上下文－类似设备上的主机进程、CUDA模块－类似设备上的动态链接库。大多数应用不使用驱动API，因为在使用运行时(runtime)API时他们不需要这额外的控制，上下文和模块管理都是隐式的，因此代码更简明。\ref{sec:driver}介绍了驱动API。详尽的描述请查看CUDA参考手册。
+
+\section{用nvcc编译}
+\label{sec:nvcccompile}
+
+内核可以使用PTX编写，PTX就是CUDA指令集架构，PTX参考手册中描述了PTX。通常PTX效率高于像C一样的高级语言。无论是使用PTX还是高级语言，内核都必须使用nvcc编译成二进制代码才能在设备上执行。
+
+nvcc是一个编译器驱动，它简化了C或PTX的编译流程：它提供了简单熟悉的命令行选项，同时通过调用一系列实现了不同编译步骤的工具集来执行它们。本节简介了nvcc的编译流程和命令选项。完整的描述可在nvcc用户手册中找到。
+
+\subsection{编译流程}
+\label{sec:compileflow}
+\subsubsection{离线编译}
+
+nvcc可编译同时包含主机代码（在主机上执行的代码）和设备代码（在设备上执行的代码）的源文件。nvcc的基本流程包括分离主机和设备代码然后：
+\begin{itemize}
+\item 将设备代码编译成汇编形式（PTX代码）或者二进制形式（cubin对象），
+\item 将执行配置节引入的$<<< , >>>$语法转化为必要的CUDA C运行时函数调用以加载和启动每个已编译的内核（来自PTX代码或者cubin对象）。
+\end{itemize}
+
+修改后的主机代码要么被输出为C代码供其它工具编译，要么在编译的最后阶段被nvcc调用主机编译器输出为目标代码。
+
+应用然后能够：
+\begin{itemize}
+\item 要么链接到生成的主机代码（这是最常见的情况），
+\item 要么忽略生成的主机代码（如果有）在设备上使用CUDA驱动API（参见\ref{sec:driver}）装载和执行PTX源码或cubin对象。
+\end{itemize}
+
+\subsubsection{即时编译}
+\label{sec:justintimecompile}
+任何在运行时被应用加载的PTX代码会被设备驱动进一步编译成二进制代码，这称为即时编译。即时编译增加了应用加载时间，但允许应用从最新编译器改进中获益，也是应用能够在未来硬件上运行的唯一方法，这些硬件在应用编译时还不存在。细节在\ref{sec:appcompatibility}。
+
+当设备驱动为某些应用即时编译某些PTX代码，它自动缓存生成的二进制代码的一个副本以避免在以后调用应用时重复编译。当设备驱动升级后该缓存（称为计算缓存）自动失效，所以应用能够从设备驱动内置的新的即时编译器获益。
+
+环境变量可用于控制即时编译：
+\begin{itemize}
+\item 设置CUDA{\_}CACHE{\_}DISABLE为1使缓存失效（也就是没有二进制代码增加到缓存或从缓存中检索）。
+\item CUDA{\_}CACHE{\_}MAXSIZE以字节为单位指定了计算缓存的大小；默认尺寸是32MB，最大尺寸是4 GB；大小超过缓存尺寸的二进制代码不会被缓存；需要时会清理旧的二进制代码以为新二进制代码腾出空间。
+\item CUDA{\_}CACHE{\_}PATH指定了计算缓存文件存储的目录；默认值是：
+\begin{itemize}
+\item Windows系统上，{\%}APPDATA$\backslash $NVIDIA$\backslash $ComputeCache,
+\item MacOS系统上，{\$}HOME/Library/Application$\backslash$Support/NVIDIA/Co-mputeCache,
+\item Linux系统上，$\sim $/.nv/ComputeCache.
+\end{itemize}
+\item 设置CUDA{\_}FORCE{\_}PTX{\_}JIT为1强制设备驱动忽略任何嵌入在应用中的二进制代码（参见\ref{sec:appcompatibility}）而即时编译嵌入的PTX代码；如果内核没有嵌入的PTX代码，加载失败；这个环境变量可以用于验证应用中是否嵌入了PTX代码和即时编译是否如预期工作以保证应用能够和将来的设备向前兼容。
+\end{itemize}
+
+\subsection{二进制兼容性}
+
+二进制代码是由架构特定的。生成cubin对象时，使用编译器选项-code指定目标架构：例如，用-code=sm{\_}13编译时，为计算能力1.3的设备生成二进制代码。二进制兼容性保证向后兼容，但不保证向前兼容，也不保证跨越主修订号的向后兼容。换句话说，为计算能力为X.y生成的cubin对象只能保证在计算能力为X.z的设备上执行，这里$z>=y$。
+
+\subsection{PTX兼容性}
+\label{sec:appcompatibility}
+
+一些PTX指令只被高计算能力的设备支持。例如，全局存储器上的原子指令只在计算能力1.1及以上的设备上支持；双精度指令只在1.3及以上的设备上支持。将C编译成PTX代码时，-arch编译器选项指定预设的计算能力。因此包含双精度计算的代码，必须使用``-arch=sm{\_}13''（或更高计算能力）编译，否则双精度计算将被降级为单精度计算。
+
+为某些特殊计算能力生成的PTX代码始终能够被编译成相等或更高计算能力设备上的二进制代码。（译者注：PTX保证完全的向后兼容，而二进制只保证主修订号相同的向后兼容）
+
+\subsection{应用兼容性}
+
+为了在特定计算能力的设备上执行代码，应用加载的二进制或PTX代码必须满足如二进制兼容性节和PTX兼容性节说明的计算能力兼容性。特别地，为了能在将来更高计算能力（不能产生二进制代码）的架构上执行，应用必须装载PTX代码并为那些设备即时编译（参见\ref{sec:justintimecompile}）。
+
+CUDA C应用中嵌入的PTX和二进制代码由-arch和-code编译器选项或-gencode编译器选项控制，详见nvcc用户手册。例如，
+\begin{lstlisting}
+nvcc x.cu
+        -gencode arch=compute_10,code=sm_10
+        -gencode arch=compute_11,code=\’compute_11,sm_11\’
+\end{lstlisting}
+
+嵌入与计算能力1.0兼容的二进制代码（第一个-gencode选项）和PTX和与计算能力1.1兼容的二进制代码（第二个-gencode选项）。
+
+生成的主机代码在运行时自动选择最合适的代码装载并执行，对于上面例子，将会是：
+\begin{itemize}
+\item 1.0二进制代码为计算能力1.0设备，
+\item 1.1二进制代码为计算能力1.1,1.2,1.3的设备，
+\item 通过为计算能力2.0或更高的设备编译1.1PTX代码获得的二进制代码。
+\end{itemize}
+
+例如，x.cu可有一个使用原子指令的优化代码途径，只能支持计算能力1.1或更高的设备。{\_}{\_}CUDA{\_}ARCH{\_}{\_}宏可以基于计算能力采用不同的代码路径。它只在设备代码中定义。例如，当使用``arch=compte{\_}11''编译时，{\_}{\_}CUDA{\_}ARCH{\_}{\_}等于110。
+
+使用驱动API的应用必须将代码编译成分立的文件，且在运行时显式装载和执行最合适的文件。
+
+nvcc用户手册为-arch,-code和-gencode编译器选项列出了多种简写。如``arc-h=sm{\_}13''是``arch=compute{\_}13 ${\rm t}$code=compute{\_}13,sm{\_}13''的简写（等价于``-gen-code arch=compute{\_}13,code=$\backslash $'compute{\_}13,sm{\_}13$\backslash $'''）。
+
+\subsection{C/C++兼容性}
+
+编译器前端依据C++语法规则处理CUDA源文件。主机代码完整支持C++。设备代码只完整支持C++的一个子集，详见\ref{sec:cppsupport}。
+
+\subsection{64位兼容性}
+
+64位版本的nvcc以64位模式编译设备代码（也就是指针是64位的）。只有在主机代码是以64位模式编译的时候，设备代码才支持64位模式。
+
+类似地，32位的nvcc以32位模式编译设备代码，使用32位模式编译的设备代码只支持以32位模式编译的主机代码。
+
+32位的nvcc使用-m64编译选项以64位模式编译设备代码。
+
+64位的nvcc使用-m32编译选项以32位模式编译设备代码。
+
+\section{CUDA C运行时}
+\label{sec:runtime}
+cudart动态库是运行时的实现，它包含在应用的安装包里，所有的函数前缀都是cuda。
+
+如\ref{sec:hetecomputing}所述，CUDA编程模型假设系统包含主机和设备，它们都有自己独立的存储器。\ref{sec:devicemem}给出了一个操纵设备存储器的函数的简介。
+
+\ref{sec:shared}描述了如何使用线程层次节引入的共享存储器以最大化性能。
+
+\ref{sec:pagelocked}引入了分页锁定主机存储器，需要它以重叠内核执行和主机和设备间的数据传输。
+
+\ref{sec:asynchronizedconcurentexecution}描述了支持系统中不同层次的异步并发执行的概念和API。
+
+\ref{sec:deviceemu}节描述了展示了编程模型如何扩展到拥有连接多个设备的主机系统。
+
+\ref{sec:errorchecking}描述了如何合适的检查主机产生的错误。
+
+\ref{sec:callstack}提到操纵CUDA C调用栈的运行时函数。
+
+\ref{sec:textureAndSurfacemem}展现了纹理和表面存储器空间，它们提供了另一种访问设备存储器的方式；它们是GPU纹理硬件的一个子集。
+
+\ref{sec:graphicsop}引入了多种运行时提供的函数，以和两大主要的图形API OpenGL和Dir-ect3D互操作。
+
+\subsection{初始化}
+
+运行时没有显式的初始化函数；在初次调用运行时函数（更精确地，不在参考手册中设备和版本管理节中的任何函数）时初始化。在计算运行时函数调用的时间和解析初次调用运行时产生的错误码时必须牢记这点。
+
+在初始化时，运行时为系统中的每个设备建立一个上下文（\ref{sec:context}提供了上下文的更多细节）。这个上下文作为设备的主要上下文，被应用中的主机线程共享。这些都是隐式发生的，运行时并没有将主要上下文展示给应用。
+
+当主机线程调用cudaDeviceReset()时，这销毁了主机线程操作的设备的主要上下文。任何以这个设备为当前设备的主机线程调用的运行时函数将为设备重新建立一个主要上下文。
+
+\subsection{设备存储器}
+\label{sec:devicemem}
+
+正如异构编程节所提到的，CUDA编程模型假定系统包含主机和设备，它们各有自己独立的存储器。内核不能操作设备存储器，所以运行时提供了分配，释放，拷贝设备存储器和在设备和主机间传输数据的函数。
+
+设备存储器可被分配为线性存储器或CUDA数组。
+
+CUDA数组是不透明的存储器层次，为纹理获取做了优化。它们的细节在\ref{sec:textureAndSurfacemem}描述。
+
+计算能力1.x的设备，其线性存储器存在于32位地址空间内，计算能力2.0的设备，其线性存储器存在于40位地址空间内，所以独立分配的存储器实体能够通过指针引用，如二叉树。
+
+典型地，线性存储器使用cudaMalloc()分配，通过cudaFree()释放，使用cudaMemcpy()在设备和主机间传输。在内核节的向量加法代码中，向量要从主机存储器复制到设备存储器
+
+\lstinputlisting{bookSrc/vecaddtotal.cu}
+
+线性存储器也可以通过cudaMallocPitch()和cudaMalloc3D()分配。在分配2D或3D数组的时候，推荐使用，因为这些分配增加了合适的填充以满足\ref{sec:devicememaccess}描述的对齐要求，在按行访问时或者在二维数组和设备存储器的其它区域间复制（用cudaMemcpy2D()和cudaMemcpy3D()函数）时，保证了最佳性能。返回的步长（pitch)必须用于访问数组元素。下面的代码分配了一个尺寸为width*height的二维浮点数组，同时演示了怎样在设备代码中遍历数组元素。
+
+\lstinputlisting{bookSrc/loopover2d.cu}
+
+下面的代码分配了一个尺寸为width*height*depth的三维浮点数组，同时演示了怎样在设备代码中遍历数组元素。
+
+\lstinputlisting{bookSrc/loopover3d.cu}
+
+参考手册列出了在cudaMalloc()分配的线性存储器，cudaMallocPitch()或c-udaMalloc3D()分配的线性存储器，CUDA数组和为声明在全局存储器和常量存储器空间分配的存储器之间拷贝的所有各种函数。
+
+下面的例子代码复制了一些主机存储器数组到常量存储器中：
+
+\lstinputlisting{bookSrc/copyconstant.cu}
+
+为声明在全局存储器空间的变量分配的存储器的地址，可以使用cudaGet-SymbolAddress()函数检索到。分配的存储器的尺寸可以通过cudaGetSymbolSize()函数获得。
+
+\subsection{共享存储器}
+\label{sec:shared}
+
+共享存储器使用{\_}{\_}shared{\_}{\_}限定词分配，详见\ref{sec:vartype}。
+
+正如\ref{sec:thread}提到的，共享存储器应当比全局存储器更快。任何用访问共享存储器取代访问全局存储器的机会应当被发掘，如下面的矩阵相乘例子展示的那样。
+
+下面的代码是矩阵相乘的一个直接的实现，没有利用到共享存储器。每个线程读入A的一行和B的一列，然后计算C中对应的元素，如图\ref{fig:mxmwithoutsmem}所示。这样，A读了B.width次，B读了A.height次。
+
+\lstinputlisting{bookSrc/mxmwithoutsmem.cu}
+
+\begin{figure}[!htb]
+\centering
+\includegraphics[bb=0 0 401 441]{figures/matrix-multiplication-without-shared-memory.png}
+\caption{没有共享存储器的矩阵相乘}
+\label{fig:mxmwithoutsmem}
+\end{figure}
+
+下面的例子代码利用了共享存储器实现矩阵相乘。本实现中，每个线程块负责计算一个小方阵Csub，Csub是C的一部分，而块内的每个线程计算Csub的一个元素。如\ref{fig:mxmwithsmem}所示。Csub等于两个长方形矩阵的乘积：A的子矩阵尺寸是（A.width,block{\_}size），行索引与Csub相同，B的子矩阵的尺寸是（block{\_}size,A.width），列索引与Csub相同。为了满足设备的资源，两个长方形的子矩阵分割为尺寸为block{\_}size的方阵，Csub是这些方阵积的和。每次乘法的计算是这样的，首先从全局存储器中将二个对应的方阵载入共享存储器中，载入的方式是一个线程载入一个矩阵元素，然后一个线程计算乘积的一个元素。每个线程积累每次乘法的结果并写入寄存器中，结束后，再写入全局存储器。
+
+采用这种将计算分块的方式，利用了快速的共享存储器，节约了许多全局存储器带宽，因为在全局存储器中，A只被读了（B.width/block{\_}size）次同时B读了（A.height/block{\_}size）次。
+
+前面代码中的Matrix 类型增加了一个stride域，这样子矩阵能够用同样的类型有效表示。{\_}{\_}device{\_}{\_}函数（见\ref{sec:funtype}）用于读写元素和从矩阵中建立子矩阵。
+
+\lstinputlisting{bookSrc/mxmwithsmem.cu}
+
+\begin{figure}[!htb]
+\centering
+\includegraphics[bb=0 0 396 402]{figures/matrix-multiplication-with-shared-memory.png}
+\caption{使用共享存储器的矩阵相乘}
+\label{fig:mxmwithsmem}
+\end{figure}
+
+\subsection{分页锁定主机存储器}
+\label{sec:pagelocked}
+
+运行时提供了使用分页锁定主机存储器（也称为pinned）的函数（与常规的使用malloc()分配的可分页的主机存储器不同）：
+\begin{itemize}
+\item cudaHostAlloc()和cudaFreeHost()分配和释放分页锁定主机存储器；
+\item cudaHostRegister()分页锁定一段使用malloc()分配的存储器。
+\end{itemize}
+
+使用分页锁定主机存储器有许多优点：
+\begin{itemize}
+\item 如\ref{sec:asynchronizedconcurentexecution}提到的，在某些设备上，设备存储器和分页锁定主机存储器间数据拷贝可与内核执行并发进行；
+\item 在一些设备上，分页锁定主机内存可映射到设备地址空间，减少了和设备间的数据拷贝，详见\ref{sec:mappedmem}；
+\item 在有前端总线的系统上，如果主机存储器是分页锁定的，主机存储器和设备存储器间的带宽会高些，如果再加上\ref{sec:writecombined}所描述的写结合（write-combining）的话，带宽会更高。
+\end{itemize}
+
+然而分页锁定主机存储器是稀缺资源，所以分页锁定主机存储器的分配会比可分页内存分配早失败。另外由于减少了系统可分页的物理存储器数量，分配太多的分页锁定内存会降低系统的整体性能。
+
+SDK中的simple zero-copy例子中有分页锁定API的详细文档。
+
+\subsubsection{可分享存储器(portable memory)}
+\label{sec:portablemem}
+一块分页锁定存储器可被系统中的所有设备使用（参看\ref{sec:deviceemu}以了解更多的多设备系统细节），但是默认的情况下，上面说的使用分布锁定存储器的好处只有分配它时，正在使用的设备可以享有（如果可能的话，所有的设备共享同一个地址空间，参见\ref{sec:unifiedAddressing}）。为了让所有线程可以使用分布锁定共享存储器的好处，可以在使用cudaHostAlloc()分配时传入cudaHostAllocPortable标签，或者在使用cudaHostRegister()分布锁定存储器时，传入cudaHostRegisterPortable标签。
+
+\subsubsection{写结合存储器}
+\label{sec:writecombined}
+默认情况下，分页锁定主机存储器是可缓存的。可以在使用cudaHostAllo-c()分配时传入cudaHostAllocWriteCombined标签使其被分配为写结合的。写结合存储器没有一级和二级缓存资源，所以应用的其它部分就有更多的缓存可用。另外写结合存储器在通过PCI-e总线传输时不会被监视（snoop），这能够获得高达40{\%}的传输加速。
+
+从主机读取写结合存储器极其慢，所以写结合存储器应当只用于那些主机只写的存储器。
+
+\subsubsection{被映射存储器}
+\label{sec:mappedmem}
+
+在一些设备上，在使用cudaHostAlloc()分配时传入cudaHostAllocMapped标签或者在使用cudaHostRegister()分布锁定一块主机存储器时使用cudaHostRegi-sterMapped标签，可分配一块被映射到设备地址空间的分页锁定主机存储器。这块存储器有两个地址：一个在主机存储器上，一个在设备存储器上。主机指针是从cudaHostAlloc（）或malloc()返回的，设备指针可通过cudaHostGetDevicePointer（）函数检索到，可以使用这个设备指针在内核中访问这块存储器。唯一的例外是主机和设备使用统一地址空间时，参见\ref{sec:unifiedAddressing}。
+
+从内核中直接访问主机存储器有许多优点：
+\begin{itemize}
+\item 无须在设备上分配存储器，也不用在这块存储器和主机存储器间显式传输数据；数据传输是在内核需要的时候隐式进行的。
+\item 无须使用流（参见\ref{sec:stream}）重叠数据传输和内核执行；数据传输和内核执行自动重叠。
+\end{itemize}
+
+由于被映射分页锁定存储器在主机和设备间共享，应用必须使用流或事件（参见\ref{sec:asynchronizedconcurentexecution}）来同步存储器访问以避免任何潜在的读后写，写后读，或写后写危害。
+
+为了在给定的主机线程中能够检索到被映射分页锁定存储器的设备指针，必须在调用任何CUDA运行时函数前调用cudaSetDeviceFlags()，并传入cudaDeviceMapHost标签。否则，cudaHostGetDevicePointer()将会返回错误。
+
+如果设备不支持被映射分页锁定存储器，cudaHostGetDevicePointer()将会返回错误。应用可以检查canMapHostMemory属性应用以查询这种能力，如果支持映射分页锁定主机存储器，将会返回1。
+
+注意：从主机和其它设备的角度看，操作被映射分页锁定存储器的原子函数（原子函数节）不是原子的。
+
+\subsection{异步并发执行}
+\label{sec:asynchronizedconcurentexecution}
+\subsubsection{主机和设备间异步执行}
+
+为了易于使用主机和设备间的异步执行，一些函数是异步的：在设备完全完成任务前，控制已经返回给主机线程了。它们是：
+\begin{itemize}
+\item 内核发射；
+\item 设备内两个不同地址间的存储器拷贝函数；
+\item 主机和设备内拷贝小于64KB的存储器块；
+\item 存储器拷贝函数中带有Async后缀的；
+\item 设置设备存储器的函数调用。
+\end{itemize}
+
+程序员可通过将CUDA{\_}LAUNCH{\_}BLOCKING环境变量设置为1来全局禁用所有运行在系统上的应用的异步内核发射。提供这个特性只是为了调试，永远不能作为使软件产品运行得可靠的方式。
+
+在下面的情形中，内核启动是同步的：
+\begin{itemize}
+\item 应用通过CUDA调试器或CUDA profiler（cuda-gdb, CUDA Visual Profiler, Parallel Nsight）运行时，所有的内核发射都是同步的。
+\item 通过剖分器（Nsight, Visual Profiler）收集硬件计数器。
+\end{itemize}
+
+\subsubsection{数据传输和内核执行重叠}
+\label{sec:overlapTransferAndKernels}
+一些计算能力1.1或更高的设备可在内核执行时，在分页锁定存储器和设备存储器之间拷贝数据。应用可以通过检查asyncEngineCount 设备属性查询这种能力（参见\ref{sec:deviceemu}），如果其大于0，说明设备支持数据传输和内核执行重叠。对于计算能力1.x的设备，这种能力只支持不涉及CUDA数组和使用cudaMallocPitch()分配的二维数组的存储器拷贝（参见\ref{sec:devicemem}）。
+
+\subsubsection{并发内核执行}
+\label{sec:concurrentKernels}
+
+一些计算能力2.x的设备可并发执行多个内核。应用可以检查concurrentK-ernels属性以查询这种能力）（参见\ref{sec:deviceemu}），如果等于1，说明支持。
+
+计算能力3.5的设备最大可并发执行的内核数目是32，其余的是16。
+
+来自不同CUDA上下文的内核不能并发执行。
+
+使用了许多纹理或大量本地存储器的内核和其它内核并发执行的可能性比较小。
+
+\subsubsection{并发数据传输}
+\label{sec:concurrentTransfer}
+在计算能力2.x的设备上，从主机分页锁定存储器复制数据到设备存储器和从设备存储器复制数据到主机分页锁定存储器，这两个操作可并发执行。
+
+应用可以通过检查asyncEngineCount 属性查询这种能力，如果等于2，说明支持。
+
+\subsubsection{流}
+\label{sec:stream}
+
+应用通过流管理并发。流是一系列顺序执行的命令（可能是不同的主机线程发射）。另外，不同流之间相对无序的或并发的执行它们的命令；这种行为是没有保证的，而且不能作为正确性的的保证（如内核间的通信没有定义）。
+
+\textbf{创建和销毁}
+\label{sec:streamCreateAndDestroy}
+可以通过创建流对象来定义流，且可指定它作为一系列内核发射和设备主机间存储器拷贝的流参数。下面的代码创建了两个流且在分页锁定存储器中分配了一个名为hostPtr的浮点数组。
+
+\begin{lstlisting}
+cudaStream_t stream[2];
+for (int i = 0; i < 2; ++i)
+    cudaStreamCreate(&stream[i]);
+float* hostPtr;
+cudaMallocHost(&hostPtr, 2 * size);
+\end{lstlisting}
+
+下面的代码定义的每个流是一个由一次主机到设备的传输，一次内核发射，一次设备到主机的传输组成的系列。
+
+\begin{lstlisting}
+for (int i = 0; i < 2; ++i) {
+    cudaMemcpyAsync(inputDevPtr + i * size, hostPtr + i * size,
+                    size, cudaMemcpyHostToDevice, stream[i]);
+    MyKernel <<<100, 512, 0, stream[i]>>>
+          (outputDevPtr + i * size, inputDevPtr + i * size, size);
+    cudaMemcpyAsync(hostPtr + i * size, outputDevPtr + i * size,
+                    size, cudaMemcpyDeviceToHost, stream[i]);
+}
+\end{lstlisting}
+
+每个流将它的hostPtr输入数组的部分拷贝到设备存储器数组inputdevPtr，调用MyKernel()内核处理inputDevPtr，然后将结果outputDevPtr传输回hostPtr同样的部分。\ref{sec:overlapbehavior}描述了例子中的流如何依赖设备的计算能力重叠。必须注意为了使用重叠hostPtr必须指向分页锁定主机存储器。
+
+调用cudaStreamDestroy()来释放流。
+
+\begin{lstlisting}
+for (int i = 0; i < 2; ++i)
+    cudaStreamDestroy(stream[i]);
+\end{lstlisting}
+
+cudaStreamDestroy()等待指定流中所有之前的任务完成，然后释放流并将控制权返回给主机线程。
+
+\textbf{默认流}
+\label{sec:defaultstream}
+没有使用流参数的内核启动和主机设备间数据拷贝，或者等价地将流参数设为0，此时发射到默认流。因此它们顺序执行。
+
+\textbf{显式同步}
+
+有很多方法显式的在流之间同步。
+
+cudaDeviceSynchronize()直到前面所有流中的命令都执行完。
+
+cudaStreamSynchronize()以某个流为参数，强制运行时等待该流中的任务都完成。可用于同步主机和特定流，同时允许其它流继续执行。
+
+cudaStreamWaitEvent()以一个流和一个事件为参数（参见事件节），使得在调用cudaStreamWaitEvent()后加入到指定流的所有命令暂缓执行直到事件完成。流可以是0，此时在调用cudaStreamWaitEvent()后加入到所有流的所有命令等待事件完成。
+
+cudaStreamQuery()用于查询流中的所有之前的命令是否已经完成。
+
+为了避免不必要的性能损失，这些函数最好用于计时或隔离失败的发射或存储器拷贝。
+
+\textbf{隐式同步}
+
+如果是下面中的任何一种操作在来自不同流的两个命令之间，这两个命令也不能并发：
+\begin{itemize}
+\item 分页锁定主机存储器分配，
+\item 设备存储器分配，
+\item 设备存储器设置，
+\item 设备内两个不同地址间的存储器拷贝函数；
+\item 默认流中调用的任何CUDA命令
+\item \ref{sec:cc2x}描述的一级缓存/共享存储器之间配置切换。
+\end{itemize}
+
+对于计算能力3.0及以下且支持并发内核执行的设备，任何需要依赖检测以确定内核发射是否完成的操作：
+\begin{itemize}
+\item 只有来自CUDA上下文中任何流中，所有在被检测内核前面的内核启动的线程块开始执行，被检测的内核才能够开始执行；
+\item 会阻塞CUDA上下文中后面任何流中所有的内核发射直至被检测的内核发射完成。
+\end{itemize}
+需要依赖检测的操作包括同一个流中的一些其它类似被检测的启动命令和流中的任何cudaStreamQuery()调用。因此，应用应当遵守这些指导以提升潜在的内核并发执行：
+\begin{itemize}
+\item 所有独立操作应当在依赖操作之前发出，
+\item 任何类型同步尽量延后。
+\end{itemize}
+
+\textbf{重叠行为}
+\label{sec:overlapbehavior}
+
+两个流的重叠执行数量依赖于发射到每个流的命令的顺序和设备是否支持数据传输和内核执行重叠（\ref{sec:overlapTransferAndKernels}）、并发内核执行（\ref{sec:concurrentKernels}）、并发数据传输（参见\ref{sec:concurrentTransfer}）。
+
+例如，在不支持并发数据传输的设备上，\ref{sec:streamCreateAndDestroy}例程的两个流并没有重叠，因为发射到流1的从主机到设备的存储器拷贝在发射到流0的从设备到主机的存储器拷贝之后，因此只有发射到流0的设备到主机的存储器拷贝完成它才开始。如果代码重写成如下方式（同时假设设备支持数据传输和内核执行重叠）。
+
+\begin{lstlisting}
+for (int i = 0; i < 2; ++i)
+    cudaMemcpyAsync(inputDevPtr + i * size, hostPtr + i * size,
+                    size, cudaMemcpyHostToDevice, stream[i]);
+for (int i = 0; i < 2; ++i)
+    MyKernel<<<100, 512, 0, stream[i]>>>
+          (outputDevPtr + i * size, inputDevPtr + i * size, size);
+    for (int i = 0; i < 2; ++i)
+    cudaMemcpyAsync(hostPtr + i * size, outputDevPtr + i * size,
+                    size, cudaMemcpyDeviceToHost, stream[i]);
+\end{lstlisting}
+
+此时发射到流1的从主机到设备的存储器拷贝和发射到流0的内核执行重叠。
+
+在支持并发数据传输的设备上，\ref{sec:streamCreateAndDestroy}例程的两个流重叠：发射到流1的从主机到设备的存储器拷贝和发射到流0的设备到主机的存储器拷贝，甚至和发射到流0的内核执行（假设设备支持数据传输和内核执行重叠）。但是内核执行不可能重叠，因为发射到流1的第二个内核执行在发射到流0的设备到主机的存储器拷贝之后，因此会被阻塞直到发射到流0的内核执行完成。如果代码被重写成上面的样子，内核执行就重叠了（假设设备支持并发内核执行），因为发射到流1的第二个内核执行在发射到流0的设备到主机的存储器拷贝之前。然而在这种情况下，发射到流0的设备到主机的存储器拷贝只和发射到流1的内核执行的最后一个线程块重叠，这只占总内核执行时间的一小部分。
+
+\textbf{回调}
+
+运行时通过cudaStreamAddCallback()提供了一种在任何执行点向流插入回调的方式。回调是一个函数，一旦在插入点之前发射到流的所有命令执行完成，回调就会在主机上执行。在流0中的回调，只能在插入点之前其它流的所有命令都完成后才能执行。
+
+下面的代码例子将回调函数MyCallbak插入到两个流中发射的主机到设备存储器的拷贝、内核执行和设备到主机的存储器拷贝操作之后。在每个设备到主机的存储器拷贝完成后该回调将会在主机上执行。
+
+\begin{lstlisting}
+void CUDART_CB MyCallback(void *data){
+    printf("Inside callback %d\n", (int)data);
+}
+...
+for (int i = 0; i < 2; ++i) {
+    cudaMemcpyAsync(devPtrIn[i], hostPtr[i], size, cudaMemcpyHostToDevice, stream[i]);
+    MyKernel<<<100, 512, 0, stream[i]>>>(devPtrOut[i], devPtrIn[i], size);
+    cudaMemcpyAsync(hostPtr[i], devPtrOut[i], size, cudaMemcpyDeviceToHost, stream[i]);
+    cudaStreamAddCallback(stream[i], MyCallback, (void*)i, 0);
+}
+\end{lstlisting}
+
+
+回调可通过在将其插入流时，使用cudaStreamCallbackBlocking标志指定为阻塞。在阻塞的回调之后发射到流中（如果回调插入在流0中，那么所有的发射到任何流中）的命令只有的回调完成后才开始执行。
+
+阻塞回调必须不能直接或间接的调用CUDA API，因为此时回调会等待自己，这导致死锁。
+
+\subsubsection{事件}
+
+通过在应用的任意点上异步地记载事件和查询事件是否完成，运行时提供了精密地监测设备运行进度和精确计时。当事件记载点前面，事件指定的流中的所有任务或者指定流中的命令全部完成时，事件被记载。只有记载点之前所有的流中的任务/命令都已完成，0号流的事件才会记载。
+
+\textbf{创建和销毁}
+
+下面的代码创建了两个事件：
+
+\begin{lstlisting}
+cudaEvent_t start, stop;
+cudaEventCreate(&start);
+cudaEventCreate(&stop);
+\end{lstlisting}
+
+以下面的方式销毁它们：
+
+\begin{lstlisting}
+cudaEventDestroy(start);
+cudaEventDestroy(stop);
+\end{lstlisting}
+
+\textbf{过去的时间}
+
+创建和销毁节建立的事件可以用下面的方式给创建和销毁节的代码计时： 
+
+\begin{lstlisting}
+cudaEventRecord(start, 0);
+for (int i = 0; i < 2; ++i) {
+    cudaMemcpyAsync(inputDev + i * size, inputHost + i * size,
+                    size, cudaMemcpyHostToDevice, stream[i]);
+    MyKernel<<<100, 512, 0, stream[i]>>>
+               (outputDev + i * size, inputDev + i * size, size);
+    cudaMemcpyAsync(outputHost + i * size, outputDev + i * size,
+                    size, cudaMemcpyDeviceToHost, stream[i]);
+}
+cudaEventRecord(stop, 0);
+cudaEventSynchronize(stop);
+float elapsedTime;
+cudaEventElapsedTime(&elapsedTime, start, stop);
+\end{lstlisting}
+
+\subsubsection{同步调用}
+
+直到设备真正完成任务，同步函数调用的控制权才会返回给主机线程。在主机线程执行任何其它CUDA调用前，通过调用cudaSetDeviceFlags()并传入指定标签（参见参考手册）可以指定主机线程的让步，阻塞，或自旋状态。
+
+\subsection{多设备系统}
+\label{sec:deviceemu}
+\subsubsection{枚举设备}
+
+主机系统上可以有多个设备。下面的代码展示了怎样枚举这些设备、查询它们的属性、确定有多少个支持CUDA的设备。
+
+\begin{lstlisting}
+int deviceCount;
+cudaGetDeviceCount(&deviceCount);
+int device;
+for (device = 0; device < deviceCount; ++device) {
+    cudaDeviceProp deviceProp;
+    cudaGetDeviceProperties(&deviceProp, device);
+    printf("Device %d has compute capability %d.%d.\n",
+           device, deviceProp.major, deviceProp.minor);
+}
+\end{lstlisting}
+
+\subsubsection{设备指定}
+
+在任何时候，主机线程都可以使用cudaSetDevice()来设置它操作的设备。设备存储器分配和内核执行都作用在当前的设备上；流和事件关联当前设备。如果没有cudaSetDevice()调用，当前设备为0号设备。
+
+下面的例程描述了设置当前设备如何影响存储器分配和内核执行。
+
+\begin{lstlisting}
+size_t size = 1024 * sizeof(float);
+cudaSetDevice(0);            // Set device 0 as current
+float* p0;
+cudaMalloc(&p0, size);       // Allocate memory on device 0
+MyKernel<<<1000, 128>>>(p0); // Launch kernel on device 0
+cudaSetDevice(1);            // Set device 1 as current
+float* p1;
+cudaMalloc(&p1, size);       // Allocate memory on device 1
+MyKernel<<<1000, 128>>>(p1); // Launch kernel on device 1
+\end{lstlisting}
+
+\subsubsection{流和事件行为}
+
+如下面的例程所示，如果内核执行和存储器拷贝发射到非关联到当前设备的流，它们将会失败。
+
+\begin{lstlisting}
+cudaSetDevice(0);               // Set device 0 as current
+cudaStream_t s0;
+cudaStreamCreate(&s0);          // Create stream s0 on device 0
+MyKernel<<<100, 64, 0, s0>>>(); // Launch kernel on device 0 in s0
+cudaSetDevice(1);               // Set device 1 as current
+cudaStream_t s1;
+cudaStreamCreate(&s1);          // Create stream s1 on device 1
+MyKernel<<<100, 64, 0, s1>>>(); // Launch kernel on device 1 in s1
+
+// This kernel launch will fail:
+MyKernel<<<100, 64, 0, s0>>>(); // Launch kernel on device 1 in s0
+\end{lstlisting}
+
+如果输入事件和输入流关联到不同的设备，cudaEventRecord()将失败。
+
+如果两个输入事件关联到不同的设备，cudaEventElapsedTime()将会失败。
+
+即使输入事件关联的设备并非当前设备，cudaEventSynchronize()和cudaE-ventQuery()也会成功。
+
+即使输入流和输入事件关联到不同的设备，cudaStreamWaitEvent()也会成功。因此cduaStreamWaitEvent()可用于在不同的设备同步彼此。
+
+每个设备有自己的默认流（参见\ref{sec:defaultstream}），因此在一个设备上发射到默认流的一个命令会和发射到另一个设备上默认流中的命令并发执行。
+
+\subsubsection{p2p存储器访问}
+
+当应用以64位进程运行时，以TCC模式在win7/Vista、在win 
+XP或者在Linux上，计算能力2.0或以上，Tesla系列设备能够访问彼此的存储器（即运行在一个设备上的内核可以解引用指向另一个设备存储器的指针）。只要两个设备上的cudaDeviceCanAccessPeer()返回true，这种p2p的存储器访问特性在它们间得到支持。
+
+如下例所示，必须通过调用cudaDeviceEnablePeerAccess()启用两个设备间的p2p存储器访问支持。
+
+两个设备使用统一存储器地址（参见\ref{sec:unifiedAddressing}），因为同一指针可用于访问两个设备的存储器，如下面的代码所示。
+
+\begin{lstlisting}
+cudaSetDevice(0);                   // Set device 0 as current
+float* p0;
+size_t size = 1024 * sizeof(float);
+cudaMalloc(&p0, size);              // Allocate memory on device 0
+MyKernel<<<1000, 128>>>(p0);        // Launch kernel on device 0
+cudaSetDevice(1);                   // Set device 1 as current
+cudaDeviceEnablePeerAccess(0, 0);   // Enable peer-to-peer access
+                                    // with device 0
+
+// Launch kernel on device 1
+// This kernel launch can access memory on device 0 at address p0
+MyKernel<<<1000, 128>>>(p0);
+\end{lstlisting}
+
+
+\subsubsection{p2p存储器复制}
+
+可以在两个不同设备间的存储器上复制存储器内容。
+
+当两个设备使用统一存储器地址空间（参见\ref{sec:unifiedAddressing}）时，使用设备存储器节提到的普通的存储器拷贝函数即可。否则使用cudaMemcpyPeer()、cudaMemcpyPeerAsync()、cudaMemcpy3Dpeer()或者cudaMemcpy3DpeerAsync()，如下面的代码所示。
+
+\begin{lstlisting}
+cudaSetDevice(0);                   // Set device 0 as current
+float* p0;
+size_t size = 1024 * sizeof(float);
+cudaMalloc(&p0, size);              // Allocate memory on device 0
+cudaSetDevice(1);                   // Set device 1 as current
+float* p1;
+cudaMalloc(&p1, size);              // Allocate memory on device 1
+cudaSetDevice(0);                   // Set device 0 as current
+MyKernel<<<1000, 128>>>(p0);        // Launch kernel on device 0
+cudaSetDevice(1);                   // Set device 1 as current
+cudaMemcpyPeer(p1, 1, p0, 0, size); // Copy p0 to p1
+MyKernel<<<1000, 128>>>(p1);        // Launch kernel on device 1
+\end{lstlisting}
+
+两个不同设备之间的存储器复制：
+\begin{itemize}
+\item 直到前面发射到任何一个设备的命令执行完，才开始执行
+\item 只有在它们执行完之后，后面发射到两者中任一设备的异步命令（参见\ref{sec:asynchronizedconcurentexecution}）可开始。
+\end{itemize}
+注意如果通过如p2p存储器访问节描述的cudaDeviceEnablePeerAccess()启用两个设备间的p2p访问，两个设备间的p2p存储器拷贝就没有必要通过主机进行，因此更快。
+
+\subsubsection{统一虚拟地址空间}
+\label{sec:unifiedAddressing}
+对于计算能力2.0或以上的设备，当应用以64位进程运行时，以TCC模式在win7/Vista（只支持Tesla系列设备）、在win XP或者在Linux上，主机和设备使用单一的地址空间。主机通过cudaHostAlloc()分配的存储器和使用cudaMalloc*()在任意设备上分配的存储器使用这个虚拟地址空间；指针指向那个存储器空间（主机存储器或任意一个设备存储器）可以通过cudaPointerG-etAttributes()确定。因此：
+\begin{itemize}
+\item 当在使用统一地址空间的设备间复制存储器时，cudaMemcpy*()中的cudaMemcpyKind参数没有作用，可用设置成cudaMemcpyDefault；
+\item 通过cudaHostAlloc()分配的存储器默认在使用统一地址空间的设备间是可分享的（参见\ref{sec:portablemem}），cudaHostAlloc()返回的指针可由这些设备上的内核直接使用（即，无需使用cudaHostGetDevicePointer()获得设备指针）。
+\end{itemize}
+
+应用可以使用unifiedAddressing设备属性（参见\ref{sec:deviceemu}）查询某个设备是否使用统一地址空间，如果返回1，即支持。
+
+\subsubsection{错误检查}
+\label{sec:errorchecking}
+
+所有的运行时函数都返回错误码，但对于异步函数（参见\ref{sec:asynchronizedconcurentexecution}），由于会在任务结束前返回，因此错误码不能报告异步调用的错误；错误码只报告在任务执行之前的错误，典型的错误有关参数有效性；如果异步调用出错，错误将会在后面某个无关的函数调用中出现。
+
+唯一能够检查异步调用出错的方式是通过在异步调用函数后面使用cudaDeviceSynchronize()同步（或使用\ref{sec:asynchronizedconcurentexecution}介绍的其它同步机制），然后检查cudaDeviceSynchronize()的返回值。
+
+运行时为每个主机线程维护着一个初始化为cudaSuccess的错误变量，每次错误发生（可以是参数不正确或异步错误）时，该变量会被错误码重写。cudaPeekAtLastError()返回这个变量，cudaGetLastError()会返回这个变量，并将它重新设置为cudaSuccess。
+
+内核发射不返回任何错误码，所以应当在内核发射后立刻调用cudaGetLa-stError()或cudaPeekAtLastError()检测发射前错误。为保证cudaGetLastError()返回的错误值不是由于内核发射之前的错误导致的，必须保证运行时错误变量在内核发射前被设置为cudaSuccess，可以通过在内核发射前调用cudaGetLastEr-ror()实现。内核发射是异步的，因此为了检测异步错误，应用必须在内核发射和cudaGetLastError()或cudaPeekAtLastError()之间同步。
+
+注意cudaStreamQuery()可能返回cudaErrorNotReady，而由于cudaEvent-Query()没有考虑错误，因此不会被cudaPeekAtLastError()或cudaGetLastError()报告。
+
+\subsection{调用栈}
+\label{sec:callstack}
+在计算能力2.x的设备上，调用栈的长度可以使用cudaDeviceGetLimit()查询，使用cudaDeviceSetLimit()设置。
+
+当调用栈上溢时，如果通过CUDA调试器（cuda-gdb，Parallel Nsight）运行，内核会因为栈上溢失败，否则会出现无法确定的启动（unspecified launch）错误。
+
+\subsection{纹理和表面存储器}
+\label{sec:textureAndSurfacemem}
+CUDA支持纹理硬件的一个子集，GPU使用这个子集访问纹理存储器和表面存储器以处理图形。如\ref{sec:devicemem}所示，从纹理存储器或表面存储器而不是全局存储器中读数据有许多性能好处。
+
+有两种不同的访问纹理和表面存储器的API:
+\begin{itemize}
+\item 所有设备都支持的纹理引用API,
+\item 只在计算能力3.x的设备上得到支持的纹理对象API.
+\end{itemize}
+
+纹理引用API具有纹理对象API没有的限制。\ref{sec:textureReference}提到了它们。
+
+\subsubsection{纹理存储器}
+\label{sec:texturemem}
+
+如\ref{sec:texturefunctions}所示，在内核中，调用纹理获取设备函数读纹理存储器。调用某个纹理获取函数读取纹理的过程称为纹理获取。每个纹理获取需要指定一个参数，如果使用纹理对象API，此参数称为纹理对象；如果是使用纹理引用API，此参数为纹理引用。
+
+纹理对象或纹理引用指定：
+\begin{itemize}
+\item 纹理，纹理定义了被获取的纹理存储器部分。如\ref{sec:textureObj}描述，纹理对象在运行创建，在建立纹理对象时需要指定纹理。纹理参考在编译时创建，必须使用运行时函数将纹理引用绑定到纹理。多种不同的纹理参考可能绑定到同一纹理或者绑定到存储器重叠的纹理。纹理可以是线性存储器的任何区域或一个CUDA数组。
+\item 维数，维数指定纹理是作为一维的数组使用一个纹理坐标、二维数组使用两个纹理坐标、还是三维数组使用三维坐标来寻址。数组的元素称为texels，是纹理元素的简称。纹理的宽度、高度和深度指数组每维的长度。\ref{tab:texturespecification}依据计算能力列出了最大纹理宽度、高度和深度。
+\item 纹理元素类型，它被限制在基本的整型、单精度浮点型和由char,short,int long, long long ,float, double定义的1，2，4个分量组成的向量类型。
+\item 读取模式，指cudaReadModeNormalizedFloat或cudaReadModeElementT-ype。如果它是cudaReadModeNormalizedFloat且纹理元素是16位或者8位整形，实际返回值是浮点类型，对于无符号整型，整形全范围被映射到[0.0，1.0]，对于有符号整型，映射成[-1.0，1.0]；例如，无符号八位值为0xff的纹理元素映射为1；如果ReadMode是cudaReadModeElementType，不会进行转换；
+\item 纹理坐标是否归一化。默认情况下，纹理使用[0，N）范围内的浮点坐标引用，其中N是坐标对应维度的尺寸。例如，尺寸为64*32的纹理可引用的坐标范围是x维[0，63]和y维[0，31]。归一化的纹理坐标范围指定为[0.0，1.0-1/N]而不是[0，N-1]，所以同样的64*32纹理的归一化坐标x维和y维可寻址范围都是[0, 1.0-1/N]。归一化的纹理坐标天然的符合某些应用的要求，如果为了让纹理坐标独立于纹理尺寸，就更可取了
+\item 寻址模式，调用\ref{sec:texturefunctions}设备函数时使用越界坐标是有效的。寻址模式定义了这种情况下的行为。默认寻址模式是将坐标钳位到有效范围：当使用非归一化纹理坐标时，为[0，N-1]；对于归一化坐标，为[0，1.0)。如果指定了边界模式，越界访问会返回0。对于归一化坐标，循环模式和镜面模式也可用。当使用循环寻址模式时，每个坐标x会被转化成frac(x）=x-floor(x)，其中floor(x)指不大于x的最大整数。在使用镜面坐标时，每个坐标x会被转化成：如果floor(x)是奇数，1-frac(x)；否则frac(x)。寻址模式以一个长度为三的数组指定，其第一、第二和第三个元素分别指定了纹理坐标三个方向的寻址模式。寻址模式是：cudaAddressModeBorder、cudaAddressModeClamp、cudaAddressModeWrap和cudaAddressModeM-irror。其中cudaAddressModeWrap和cudaAddressModeMirror只支持归一化坐标。
+\item 滤波模式指定了纹理获取时返回值如何依据输入纹理坐标计算。线程纹理滤波只能对返回值配置为浮点型的纹理起作用。它在周围的纹理元素点上执行低精度插值。如果启用滤波，纹理获取点周围的点被读取，纹理获取点的返回值基于某些元素进行插值，纹理获取点坐标落入那些元素的坐标中间。对于一维的纹理进行简单的线性插值，二维纹理使用双线性插值, 而三维纹理使用三线性插值。\ref{sec:texfetch}给出了许多细节。滤波模式是：cudaFilterModePoint和cudaFilterModeLinear。如果是cudaFilterModePoint，返回值是最靠近纹理获取坐标的元素的值。如果是cudaFilterModeLinear，返回值是2（一维纹理）、4（二维纹理）、或8（三维纹理）个最接近纹理获取坐标进行线程插值。cudaFilterModeLinear只对返回值是浮点类型的纹理有效。
+\end{itemize}
+
+\textbf{纹理对象API}
+\label{sec:textureObj}
+使用cduaCreateTextureObject()从类型为cudaResourceDesc的资源描述符创建纹理对象，cudaResourceDesc定义如下：
+
+\begin{lstlisting}
+struct cudaTextureDesc
+{
+    enum cudaTextureAddressMode addressMode[3];
+    enum cudaTextureFilterMode  filterMode;
+    enum cudaTextureReadMode    readMode;
+    int                         sRGB;
+    int                         normalizedCoords;
+    unsigned int                maxAnisotropy;
+    enum cudaTextureFilterMode  mipmapFilterMode;
+    float                       mipmapLevelBias;
+    float                       minMipmapLevelClamp;
+    float                       maxMipmapLevelClamp;
+};
+\end{lstlisting}
+
+其中：
+\begin{itemize}
+\item addressMode指定寻址模式；
+\item filterMode指定滤波模式；
+\item readMode指定寻址模式；
+\item normalizedCorrds指定纹理坐标是否归一化；
+\end{itemize}
+
+参考手册以了解sRGB, maxAnisotropy, mipmapFilterMode, mipmapLevelBias, minMipmapLevelClamp和maxMipmapLevelClamp。
+
+下面的代码例子在纹理上应用了一些简单的转换。
+\lstinputlisting{bookSrc/texobjecttran.cu}
+
+\textbf{纹理参考API}
+\label{sec:textureReference}
+纹理参考的一些属性不可变并且在编译时必须知道；它们在声明纹理参考时指定。纹理参考必须在文件域内声明，变量类型为texture；
+\begin{lstlisting}
+texture<DataType, Type, ReadMode> texRef;
+\end{lstlisting}
+
+其中：
+\begin{itemize}
+\item DataType指定纹理元素数据类型；
+\item Type指定纹理参考的类型，且等于cudaTextureType1D（一维纹理）, cudaTextureType2D（二维纹理）或cudaTextureType3D（三维纹理），或者cudaTextureType1Dlayered（一维层次纹理）或cudaTextureType2Dlay-ered（二维层次纹理），Type是可选的，默认为cudaTextureType1D；
+\item ReadMode指定读取模式。ReadMode是个可选参数，默认为cudaReadMo-deElementType。
+\end{itemize}
+
+纹理参考只能被声明为全局静态变量，且不能作为函数的参数传递。
+
+其它的纹理引用属性是可变的，且能够在运行时通过主机运行时更改。如参考手册中所解释的，运行时API有一个低级的C风格的接口和一个高级的C++风格的接口。texture类型是在高级API中定义的一个结构体，公有继承自在低级API中定义的textrueReference类型。textureReference定义如下：
+
+\begin{lstlisting}
+struct textureReference {
+    int                          normalized;
+    enum cudaTextureFilterMode   filterMode;
+    enum cudaTextureAddressMode  addressMode[3];
+    struct cudaChannelFormatDesc channelDesc;
+    int                          sRGB;
+    unsigned int                 maxAnisotropy;
+    enum cudaTextureFilterMode   mipmapFilterMode;
+    float                        mipmapLevelBias;
+    float                        minMipmapLevelClamp;
+    float                        maxMipmapLevelClamp;
+}
+\end{lstlisting}
+
+\begin{itemize}
+\item normalized指定纹理坐标是否归一化；
+\item filterMode指定滤波模式；
+\item addressMode 指定寻址模式； 
+\item channelDesc 描述获取纹理时返回值的格式；它必须和DataType匹配；channelDesc类型定义如下：
+\begin{lstlisting}
+struct cudaChannelFormatDesc {
+  int x, y, z, w;
+  enum cudaChannelFormatKind f;
+};
+\end{lstlisting}
+
+其中 x、y、z 和 w 是返回值各组件的位数，而 f 为：
+\begin{itemize}
+\item cudaChannelFormatKindSigned，如果这些组件是有符号整型；
+\item cudaChannelFormatKindUnsigned，如果这些组件是无符号整型；
+\item cudaChannelFormatKindFloat，如果这些组件是浮点类型。
+\end{itemize}
+\end{itemize}
+
+normalized、addressMode 和 filterMode 可直接在主机代码中修改。
+
+在内核中使用纹理参考从纹理存储器中读取数据之前，对于线性存储器必须使用cudaBindTexture() 或 cudaBindTexture2D()，对于CUDA数组，必须使用cudaBindTextureToArray()，将纹理参考绑定到纹理。cudaUnbindTexture()用于解绑定纹理参考。建议使用cudaMallocPitch()分配在线性存储器中的二维纹理，然后使用其返回的列长作为cudaBindTexture2D()的参数。
+
+下面的代码将纹理参考绑定到devPtr指针指向的线性存储器：
+\begin{itemize}
+\item 使用低级API：
+\begin{lstlisting}
+texture<float, cudaTextureType2D,
+        cudaReadModeElementType> texRef;
+textureReference* texRefPtr;
+cudaGetTextureReference(&texRefPtr, texRef);
+cudaChannelFormatDesc channelDesc =
+                             cudaCreateChannelDesc<float>();
+size_t offset;
+cudaBindTexture2D(&offset, texRefPtr, devPtr, &channelDesc,
+                  width, height, pitch);
+\end{lstlisting}
+
+\item 使用高级API
+\begin{lstlisting}
+texture<float, cudaTextureType2D,
+        cudaReadModeElementType> texRef;
+cudaChannelFormatDesc channelDesc =
+                             cudaCreateChannelDesc<float>();
+size_t offset;
+cudaBindTexture2D(&offset, texRef, devPtr, channelDesc,
+                  width, height, pitch);
+\end{lstlisting}
+\end{itemize}
+
+下面的代码将纹理绑定到CUDA数组cuArray：
+\begin{itemize}
+\item 使用低级API
+\begin{lstlisting}
+texture<float, cudaTextureType2D, cudaReadModeElementType> texRef;
+textureReference* texRefPtr;
+cudaGetTextureReference(&texRefPtr, texRef);
+cudaChannelFormatDesc channelDesc;
+cudaGetChannelDesc(&channelDesc, cuArray);
+cudaBindTextureToArray(texRef, cuArray, &channelDesc);
+\end{lstlisting}
+\item 使用高级API
+\begin{lstlisting}
+texture<float, cudaTextureType2D,
+        cudaReadModeElementType> texRef;
+cudaBindTextureToArray(texRef, cuArray);
+\end{lstlisting}
+\end{itemize}
+
+声明纹理参考时指定的参数必须与将纹理绑定到纹理参考时指定的格式匹配；否则纹理获取的结果没有定义。
+
+下面的代码在内核中应用了一些简单的转换。(译者注：该变换是沿中心旋转theta)
+
+\lstinputlisting{bookSrc/texreftran.cu}
+
+\textbf{16位浮点纹理}
+
+CUDA数组支持的16位浮点或者半精度格式与IEEE-754-2008的binary2格式一样。
+
+CUDA C不支持对应的数据类型，但提供了内置函数以通过unsigned short和32位浮点之间转换：{\_}{\_}float2half(float)和{\_}{\_}half2float(unsigned short)。这些函数只在设备代码中得到支持。对应的主机端代码可以在OpenEXR库中找到。
+
+在纹理获取之中，在任何滤波进行之前，16位浮点组件提升到32位浮点。
+
+可以使用cudaCreateChannelDescHalf*()函数建造一个16位浮点格式的通道描述。
+
+\textbf{层次纹理}
+
+一维或者二维的层次纹理（如Direct3D中的纹理数组，OpenGL中的数组纹理）是由一系列层次组成的纹理，这些层次通常具有相同维度、尺寸和数据类型的纹理。
+
+一个一维的层次纹理使用整数索引和一个浮点纹理坐标寻址，以访问层次中的一个元素，这个索引标识一系列中的某一层。二维层次使用一个整形索引标识纹理和两个浮点纹理坐标以访问层次中的一个像素。
+
+层次纹理只能被绑定到以cudaArrayLayered标签（对于一维层次纹理高度为0）使用cudaMalloc3Darray()建造的CUDA数组。
+
+层次纹理使用\ref{sec:1dlayer}和\ref{sec:2dlayer}描述的设备函数获取，纹理滤波只局限于一层而非多层。
+
+层次纹理只在计算能力2.0及以上的设备上得到支持。
+
+\textbf{立方位图纹理}
+
+立方位图纹理是二维层次纹理的一种特殊类型，它具有六个层以表示立方体的六个面：
+\begin{itemize}
+\item 一层的高度等于宽度。
+\item 立方位图使用三个纹理坐标x,y,z寻址，这三个坐标解释为以立方体中心为原点指向立方体某个面的方向向量，并返回对应该面的纹理层的纹理元素。更确切的说：面通过最大的坐标m选取，且对应的层通过坐标(s/m+1)/2和(t/m+1)/2寻址，m、s和t的定义如下：
+\begin{table}[htbp]
+\begin{tabular}
+{|p{120pt}|p{40pt}|p{40pt}|p{40pt}|p{40pt}|p{40pt}|}
+\multicolumn{6}{|p{340pt} <{\centering}|}{表1. 立方位图获取}  \\
+\hline
+\multicolumn{2}{|p{140pt}|}{} & face& m& s& t \\
+\hline
+\raisebox{-1.50ex}[0cm][0cm]{$|x|>|y|$ and $|x|>|z|$} & 
+$x>=0$ & 0 & x& 
+-z& 
+-y \\
+\cline{2-6} 
+ & 
+$x<0$ & 
+1& 
+-x& 
+z& 
+-y \\
+\hline
+\raisebox{-1.50ex}[0cm][0cm]{$|y|>|x|$ and $|y|>|z|$}& 
+$y>=0$ & 
+2& 
+y& 
+x& 
+z \\
+\cline{2-6} 
+ & 
+$y<0$ & 
+3& 
+-y& 
+x& 
+-z \\
+\hline
+\raisebox{-1.50ex}[0cm][0cm]{$|z|>|x|$ and $|z|>|y| $}& 
+$z>=0$ & 
+4& 
+z& 
+x& 
+-y \\
+\cline{2-6} 
+ & 
+$Z<0$ & 
+5& 
+-z& 
+-x& 
+-y \\
+\hline
+\end{tabular}
+\label{tab:cubemap}
+\end{table}
+
+\end{itemize}
+
+层次纹理只能是CUDA数组，这个数组通过调用cudaMalloc3DArray()时使用cudaArrayCubemap标签创建。
+
+立方位图纹理使用\ref{sec:texcubemap}描述的设备函数获取。
+
+立方位图纹理只有计算能力2.0及以上的设备中得到支持。
+
+\textbf{层次立方位图纹理}
+
+层次立方位图纹理是一个层次纹理，其层由同样维度的立方位图组成。
+
+层次立方位图纹理使用一个整数索引和三个浮点纹理坐标寻址；整数索引标记某个立方位图纹理，而三位坐标寻址该立方位图纹理的某个元素。
+
+层次纹理只能是CUDA数组，这个数组通过调用cudaMalloc3DArray()时使用cudaArrayCubemap标签创建
+
+层次立方位图纹理使用\ref{sec:cubemaplayer}描述的设备函数获取。纹理滤波只会在某层内进行而不会跨层进行。
+
+层次立方位图纹理只有计算能力2.0及以上的设备中得到支持。
+
+\textbf{纹理收集}
+
+纹理收集是一种特殊的纹理获取，其只支持二维纹理。纹理收集通过tex2Dgather()函数执行，其参数和tex2D()相似，外加一个comp参数，comp只可能取0,1,2,3。tex2Dgather()返回4个32位数，这4个数是用于正常纹理获取的双线性插值的4个向量的分量。例如，如果这正常纹理获取得到的4个向量为(253,20,31,255)、(250,25,29,254)、(249,16,37,253)和(251,22,30,250)，且comp为2，则tex2Dgather()返回值为(31,29,37,30)。
+
+纹理收集只支持使用cudaArrayTextureGather标签建立的CUDA数组，且长度要小于\ref{tab:texturespecification}中规定，这些规定要比正式的纹理获取小。
+
+纹理收集只支持计算能力2.0以上的设备。
+
+\subsubsection{表面存储器(surface)}
+\label{sec:surfacemem}
+在计算能力2.0或以上的设备上，使用cudaArraySurfaceLoadStore标签建立的CUDA数组，可以通过表面对象或表面参考使用\ref{sec:surfacefunctions}描述的函数读写。
+
+\ref{tab:texturespecification}根据计算能力列出了最大的表面宽度、高度和深度。
+
+\textbf{表面对象API}
+
+使用cudaCreateSurfaceObject()从类型为cudaResourceDesc的资源描述符创建表面对象。
+
+下面的代码应用了一些简单的变换到纹理上。
+
+\lstinputlisting{bookSrc/surfobjtran.cu}
+
+\textbf{表面参考API}
+
+表面参考定义在文件域内，声明为surface类型
+\begin{lstlisting}
+surface<void, Type> surfRef;
+\end{lstlisting}
+
+其中Type指定表面参考的类型，其值为cudaSurfaceType1D, cudaSurfaceType2D, cudaSurfaceType3D, cudaSurfaceTypeCubemap, cudaSurfaceType1D-Layered, cudaSurfaceType2DLayered, cudaSurfaceTypeCubemapLayered；Type是可选的，其默认值为cudaSurfaceType1D。表面参考只能声明为全局静态变量，且不能作为参数传递给函数。
+
+在使用表面参考读写CUDA 数组前，必须使用cudaBindSurfaceToArray绑定到CUDA数组。
+
+下面的例程绑定表面参考到CUDA数组cuArray。
+\begin{itemize}
+\item 使用低级API:
+\begin{lstlisting}
+surface<void, cudaSurfaceType2D> surfRef;
+surfaceReference* surfRefPtr;
+cudaGetSurfaceReference(&surfRefPtr, "surfRef");
+cudaChannelFormatDesc channelDesc;
+cudaGetChannelDesc(&channelDesc, cuArray);
+cudaBindSurfaceToArray(surfRef, cuArray, &channelDesc);
+\end{lstlisting}
+\item 使用高级API: 
+\begin{lstlisting}
+surface<void, cudaSurfaceType2D> surfRef;
+cudaBindSurfaceToArray(surfRef, cuArray);
+\end{lstlisting}
+\end{itemize}
+
+使用表面函数读写的CUD时的类型必须匹配并且通过类型必须匹配的表面参考；否则读写CUDA数组的结果未定义。
+
+不像纹理存储器，表面存储器使用字节寻址。这意味着通过纹理函数访问纹理元素的x坐标需要乘以元素的字节数以通过表面函数访问同一个元素。例如，绑定到纹理参考texRef的一个一维浮点CUDA数组，其纹理坐标x处的元素，和一个表面参考surfRef，通过texRef使用tex1d(texRef, x)访问，对应的通过surfRef以surf1Dread(surfRef, 4*x)访问。同样地，绑定到纹理参考texRef的一个二维浮点CUDA数组，其纹理坐标x，y处的元素，和一个表面参考surfRef，通过texRef使用tex2d(texRef, x, y)访问，对应的通过surfRef以surf2Dread(surfRef, 4*x, y)访问（y坐标的字节偏移在底层通过CUDA数组的行距计算）。
+
+下面的例程做了一些简单转换：
+\lstinputlisting{bookSrc/surfreftran.cu}
+
+\textbf{立方位图表面}
+
+立方位图表面像一维层次表面，通过surfCubemapread()和surfCubemapwr-ite()访问。即，使用一个整型索引确定一个面，以两个浮点纹理坐标在对应该面的纹理层内寻址一个元素。面的顺序如\ref{tab:cubemap}所示。
+
+\textbf{层次立方位图表面}
+
+层次立方位图表面像二维层次表面，使用surfCubemapLayeredread()和sur-fCubemapLayeredwrite()访问。即，使用一个整型索引确定一个面，以两个浮点纹理坐标在对应该面的纹理层内寻址一个元素。面的顺序如\ref{tab:cubemap}所示，所以索引（2*6+3）访问第三个立方位图的第四个面。
+
+\subsubsection{CUDA 数组}
+
+CUDA数组是为纹理获取优化的不透明的存储器层次。它们可以是一维的，二维的或三维的，也可由多个元素组成，每个元素可有1，2或4个组件，这些组件可能是有符号或无符号8，16或32位整形，16位浮点，或32位浮点。CUDA数组只能在内核中通过\ref{sec:texturemem}描述的纹理获取读取或\ref{sec:surfacemem}描述的表面读写访问。
+
+\subsubsection{读写一致性}
+
+纹理和表面存储器是有缓存的（参见\ref{sec:devicemem}），且在同一个内核调用，缓存并不和全局存储器写和表面存储器写保持一致，因此任何纹理获取或表面读一个在同一内核中被全局存储器写或者表面写过的地址，其结果是不确定的。换言之，一个线程能安全的读一些纹理或表面存储器位置当且仅当这个位置已经被前一个内核调用或存储器拷贝更新过，但是并非被同一内核的当前线程或其它线程更新过。
+
+\subsection{图形学互操作性}
+\label{sec:graphicsop}
+一些OpenGL和Direct3D的资源可被映射到CUDA地址空间，要么使CUDA可以读OpenGL或Direct3D写的数据，要么使CUDA写数据供OpenGL或Direct3D消费。
+
+资源必须先在CUDA中注册，才能被\ref{sec:openglop}和\ref{sec:d3dop}提到的函数映射。这些函数返回一个指向cudaGraphicsResource类型结构体的CUDA图形资源。资源注册是潜在高消耗的，因此通常每个资源只注册一次。可以使用cudaGraphicsUnregisterResource()取消注册CUDA图形资源。
+
+一旦资源被注册到CUDA，就可以按需要被任意次的映射和解映射，映射和解映射使用cudaGraphicsMapResources()和cudaGraphicsUnmapResources()。可以使用cudaGraphicsResourceSetMapFlags()来指定资源用处（只读，只写），CUDA驱动可以据此优化资源管理。
+
+可以获得cudaGraphicsResourceGetMappedPointer()为缓冲区返回的设备地址空间和cudaGraphicsSubResourceGetMappedArray()为CUDA数组返回的设备地址空间，内核通过读写这些空间读写被映射资源。
+
+通过OpenGL或Direct3D访问被映射到CUDA的OpenGL或Direct3D的资源，其结果未定义。\ref{sec:openglop}和\ref{sec:d3dop}给出了每种图形API的特性和一些代码例子。\ref{sec:sliop}给出了系统在SLI模式下的特性。
+
+\subsubsection{OpenGL互操作性}
+\label{sec:openglop}
+和OpenGL互操作要求在其它任何运行时函数调用前，使用cudaGL-SetGLDevice()指定CUDA设备。注意cudaSetDevice()和cudaGLSetDevice()是相互排斥的。
+
+可以被映射到CUDA地址空间的OpenGL资源有OpenGL缓冲区、纹理和渲染缓存对象。
+
+使用cudaGraphicsGLRegisterBuffer()注册缓冲对象。在CUDA中，缓冲对象表现为设备指针，因此可以在内核中或通过调用cudaMemcpy()读写。
+
+纹理或渲染缓存对象使用cudaGraphicsGLRegisterImage()注册，在CUDA中，它们表现为CUDA数组，内核通过将其绑定到纹理参考或表面参考以读取。如果该资源使用使用cudaGraphicsRegisterFlagsSurfaceLoadStrore标签注册，也可通过表面参考写，也可通过cudaMemcpy2D()调用读写。cudaGraphicsGLReg-isterImage()支持有1、2、4个组件和使用内置的float类型（例如，GL{\_}RGBA{\_}FL-OAT32）、归一化整数（例如GL{\_}RGBA8，GL{\_}INTENSITY16）和非归一化整数（例如GL{\_}RGBA8UI）（请注意，由于GL{\_}RGBA8UI是OpenGL3.0纹理格式，只能被着色器写，不能被固定功能的流水线写）。
+
+资源共享的OpenGL上下文必须是调用OpenGL互操作API的主机线程的当前上下文。
+
+下面的代码使用内核动态的修改一个存储在顶点缓冲对象中的二维width*height顶点网格。
+
+\lstinputlisting{bookSrc/openglop.cu}
+
+在Windows系统上和对于Quadro显卡，可以用cudaWGLGetDevice()检索关联到wglEnumGpusNV()返回的句柄的CUDA设备。Quadro显卡与OpenGL的互操作性能比GeForce和Tesla要好。在一个多GPU的系统中，在Quadro 
+GPU上运行OpenGL渲染，在其它的GPU进行CUDA计算。
+
+\subsubsection{Direct3D互操作性}
+\label{sec:d3dop}
+Direct3D互操作性支持Direct3D 9，Direct3D 10，和Direct3D 11。
+
+一个CUDA上下文每次只能和一个Direct3D设备互操作，且CUDA上下文和Direct3D设备必须在同一个GPU上创建，另外当创建设备时要注意下列情况：Direct3D9设备必须在创建时将DeviceType设置成D3DDEVTYPE{\_}HAL且将BehaviorFlags设置成D3DCREATE{\_}HARDWARE{\_}VERTEXPROCESSING，\par Direct3D 10和Direct3D 11 设备创建时必须将DriverType设置成\par D3D{\_}DRIVER{\_}TYPE{\_}HARDWARE。
+
+和Direct3D的互操作性要求：在任何其它的运行时函数调用前，使用cuda-D3D9SetDirect3DDevice()，cudaD3D10SetDirect3DDevice() 和cudaD3D11Set-Direct3DDevice()指定Direct3D设备。可用cudaD3D9GetDevice()、cudaD3D10-GetDevice() 和 cudaD3D11GetDevice()检索关联到一些适配器的CUDA设备。
+
+存在一组调用以创建和Direct3D设备互操作的CUDA上下文，这些Direct3D设备使用工作在AFR（可替代帧渲染）模式下的NVIDIA速力（SLI）：cudaD3D-$[9|10|11]$GetDevices()。cudaD3D[9$\vert $10$\vert $11]GetDevices()调用可以获得一个CUDA设备句柄列表，这些句柄可以作为最后一个参数（可选的）传给cudaD3D$[9|10|11]$-SetDirect3Ddevice()。
+
+应用有下面两种方法可以选择：创建多个CPU线程，每个使用一个不同的CUDA上下文；或者单个CPU线程使用多个CUDA上下文。如果为每个GPU使用一个独立的CPU线程，每个CUDA上下文由每个CPU线程调用CUDA运行时创建。cudaD3D$[9|10|11]$SetDirect3Ddevice()使用\par cudaD3D$[9|10|11]$GetDevices()返回的CUDA设备句柄之一。
+
+如果使用单个CPU线程，为了和使用NVIDIA速力的Direct3D设备互操作，不得不使用CUDA 驱动API函数创建CUDA上下文。应用依靠CUDA驱动API和运行时API的互操作性，这种互操作允许调用cuCtxPushCurrent()和c-uCtxPopCurrent()以在既定时间改变活跃CUDA上下文。
+
+可以被映射到CUDA地址空间的Direct3D资源有Direct3D缓冲区，纹理和表面。可以使用cudaGraphicsD3D9RegisterResource()， cudaGraphicsD3D10R-egisterResource()和cudaGraphicsD3D11RegisterResource()注册这些资源。
+
+下面的代码使用内核动态的修改一个存储在顶点缓冲对象中的二维width*height网格顶点。
+
+Direct3D 9版本
+\lstinputlisting{bookSrc/d3d9op.cu}
+
+Direct3D 10版本：
+\lstinputlisting{bookSrc/d3d10op.cu}
+
+Direct3D 11 版本：
+\lstinputlisting{bookSrc/d3d11op.cu}
+
+\subsubsection{SLI（速力）互操作性}
+\label{sec:sliop}
+在一个多GPU的系统中，所有的支持CUDA的GPU都可以被驱动和运行时作为独立的设备访问。当系统在SLI模式时，有许多特殊的考虑，如下所描述。
+
+首先，所有在一个CUDA设备上的存储器分配将消耗其它GPU的存储器，这是Direct3D设备的SLI配置的一部分。因为这点，存储器分配将会比我们希望的要早失败。
+
+其次，应用不得不建立多个CUDA上下文，每个在SLI配置下的GPU一个，且有一个不同的GPU被Direct3D或OpenGL设备用于在每一帧时渲染。应用能够使用cudaD3D[9$\vert $10$\vert $11]GetDevices()或cudaGLGetDevices()系列调用以确定当前和下一帧进行渲染的GPU。有了这信息，应用将映射Direct3D或OpenG-L资源到关联到cudaD3D[9$\vert
+$10$\vert $11]GetDevices()或cudaGLGetDevices()返回的设备的CUDA上下文，此时deviceList参数设置为\par CU{\_}D3D10{\_}DEVICE{\_}LIST{\_}CURRENT{\_}FRAME。
+
+参见\ref{sec:openglop}和\ref{sec:d3dop}以了解CUDA是分别如何与Direct3D或OpenGL互操作。
+
+\section{版本和兼容性}
+
+在开发CUDA应用时，开发人员应该关注两种版本号：计算能力描述了基本规范和计算设备特性（见计算能力节），CUDA驱动API版本描述了驱动API和运行时API支持的特性。
+
+驱动API的版本在驱动头文件中定义为CUDA{\_}VERSION。开发人员可用其检查其应用是否要比当前版本更新的驱动。这非常重要，因为驱动API是向后兼容的，这意味着特定版本编译的应用、插件和库（包括C运行时）能够在以后发布的驱动上工作，如图\ref{fig:cocv}所示。但是驱动API不是向前兼容的，这意味着特定版本编译的应用、插件和库（包括C运行时）不能够在以前发布的驱动上工作。
+
+特别要注意混合版本是不支持的；尤其：
+\begin{itemize}
+\item 一个系统上所有应用、插件和库必须使用同一版本的CUDA驱动API，因为一个系统上只能安装一种版本的CUDA驱动。
+\item 应用使用的所有插件和库必须使用同一版本的运行时。
+\item 应用使用的所有插件和库必须同一版本的任何使用了运行时的库（如CUFFT，CUBLAS）。
+\end{itemize}
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[bb=0 0 172 168]{figures/compatibility-of-cuda-versions.png}
+\caption{驱动API是向后兼容，而非向前兼容}
+\label{fig:cocv}
+\end{figure}
+
+\section{计算模式}
+
+在Linux和Windows Server 2008及更高版本上运行的Tesla解决方案，可以使用NVIDIA的系统管理接口（nvidia-smi）设置系统上任何设备的计算模式的为下面的三种之一，nvidia-smi是一个作为Linux驱动一部分发布的工具。
+\begin{itemize}
+\item 默认模式：多个主机线程可同时使用设备（使用运行时调用cudaSetDevice()，或使用驱动API时将关联到设备的上下文作为当前上下文）。
+\item 互斥进程计算模式：在系统的所有进程之间，一个设备上只能建立一个CUDA上下文，该上下文可以成为建立该上下文的进程中的许多线程的当前上下文。
+\item 互斥进程和线程计算模式：在系统的所有进程之间，一个设备只能建立一个CUDA上下文，而且一次只能成为一个线程的上下文。
+\item 禁止模式：不允许任何主机线程使用设备。
+\end{itemize}
+
+特别地，这意味着使用运行时且没有显式调用cudaSetDevice()的主机线程可能不被关联到0号设备，如果0号设备刚好工作在禁止模式或在互斥进程模式下工作但被其它进程使用或在互斥进程线程下工作但被其它线程使用。cudaSetValidDevice()可基于设备优先级列表设置一个设备。
+
+应用可检查computeMode属性（参见\ref{sec:deviceemu}）以查询设备的计算模式。
+
+\section{模式切换}
+
+GPU 将部分 DRAM 存储器用于所谓的主表面（primary surface），它用于刷新显示器，用户查看显示器的输出。当用户通过更改显示器的分辨率或位深度（使用NVIDIA 的控制面板或 Windows的显示控制面板）初始化模式切换时，主表面所需的存储器数量随之改变。例如，如果用户将显示器的分辨率从1280*1024*32 位更改为 1600*1200*32 位，系统必须为主表面分配 7.68 MB 的存储器，而不是 5.24 MB（使用防锯齿设置运行的全屏图形应用可能需要为主表面分配更多存储器用于显示）。在Windows 上，其他事件也可能会启动显示模式切换，包括启动全屏 DirectX 应用程序、按 Alt+Tab 键从全屏 DirectX 应用中切换出来或者按 Ctrl+Alt+Del 键锁定计算机。
+
+如果模式切换增加了主表面所需的存储器数量，系统可能就必须挪用分配给 CUDA 应用的存储器，因此模式切换可能导致任何调用CUDA运行时的应用崩溃并返回无效上下文错误。
+
+\section{Windows上的Tesla计算集群模式}
+
+使用NVIDIA系统管理接口（nvidia-smi），对于计算能力2.0及以上的Tesl-a和Quadro系列设备，Windows设备驱动能够进入TCC（Tesla计算集群）模式。
+
+这种模式有下列主要优点：
+\begin{itemize}
+\item 它使得在非NVIDIA集成显卡的集群节点上使用GPUs成为可能；
+\item 可以通过远程桌面使用GPU，直接或者通过集群管理系统使用GPU都依赖远程桌面；
+\item 它使得作为Windows服务运行的应用能够使用GPU（即在会话0）。
+\end{itemize}
+然而TCC模式不支持任何图形功能。

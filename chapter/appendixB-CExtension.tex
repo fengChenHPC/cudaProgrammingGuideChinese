@@ -1,0 +1,1591 @@
+\chapter{C语言扩展}
+\label{sec:cextension}
+
+\section{函数类型限定符}
+\label{sec:funtype}
+
+函数类型限定符指定函数是在主机上执行还是在设备上执行和是从主机上调用还是从设备上调用。
+
+\subsection{ {\_}{\_}device{\_}{\_}}
+
+使用 {\_}{\_}device{\_}{\_} 限定符声明的函数：
+\begin{itemize}
+\item 在设备上执行；
+\item 仅可通过设备调用。
+\end{itemize}
+
+\subsection{ {\_}{\_}global{\_}{\_}}
+
+使用 {\_}{\_}global{\_}{\_} 限定符可将函数声明为内核。此类函数：
+\begin{itemize}
+\item 在设备上执行；
+\item 只能通过主机调用。
+\end{itemize}
+
+{\_}{\_}global{\_}{\_} 函数的返回类型必须为空。
+
+对 {\_}{\_}global{\_}{\_} 
+函数的任何调用都必须按\ref{sec:executionconfiguration}的方法指定其执行配置。
+
+{\_}{\_}global{\_}{\_} 函数的调用是异步的，也就是说它会在设备执行完成之前返回。
+
+\subsection{ {\_}{\_}host{\_}{\_}}
+
+使用 {\_}{\_}host{\_}{\_} 限定符声明的函数：
+\begin{itemize}
+\item 在主机上执行；
+\item 仅可通过主机调用。
+\end{itemize}
+
+仅使用 {\_}{\_}host{\_}{\_} 限定符声明函数等同于不使用{\_}{\_}host{\_}{\_}、{\_}{\_}device{\_}{\_} 或 {\_}{\_}global{\_}{\_} 限定符声明函数，这两种情况下，函数都将仅为主机进行编译。
+
+{\_}{\_}global{\_}{\_} 和 {\_}{\_}host{\_}{\_} 限定符不能一起使用。
+
+但 {\_}{\_}host{\_}{\_} 限定符也可与 {\_}{\_}device{\_}{\_} 限定符一起使用，此时函数将为主机和设备同时进行编译。
+
+\ref{sec:appcompatibility}引入的{\_}{\_}CUDA{\_}ARCH{\_}{\_}宏可用于区别主机和设备间不同的代码路径。
+
+\begin{lstlisting}
+__host__ __device__ func()
+{
+#if __CUDA_ARCH__ == 100
+    // Device code path for compute capability 1.0
+#elif __CUDA_ARCH__ == 200
+    // Device code path for compute capability 2.0
+#elif __CUDA_ARCH__ == 300
+   // Device code path for compute capability 3.0
+#elif !defined(__CUDA_ARCH__) 
+   // Host code path
+#endif 
+}
+\end{lstlisting}
+
+
+\subsection{ {\_}noinline{\_} 和 {\_}{\_}forceinline{\_}{\_}}
+\label{sec:noinline_inline}
+
+在计算能力1.x的设备上，默认情况下，{\_}{\_}device{\_}{\_} 函数总是内联的；在计算能力2.x及以上的设备上，只有在编译器认为必要时才内联。
+
+{\_}{\_}noinline{\_}{\_} 函数限定符暗示编译器尽可能不要内联该函数。函数体必须位于所调用的同一个文件内。在计算能力1.x的设备上，如果函数有指针参数或者参数列表比较长，编译器会忽视{\_}{\_}noinline{\_}{\_}限定符。在计算能力2.x的设备上，{\_}{\_}noinline{\_}{\_}永远有效。
+
+{\_}{\_}forceinline{\_}{\_}限制符强制编译器内联。
+
+\section{变量类型限定符}
+\label{sec:vartype}
+
+变量类型限定符指定变量在设备上的存储位置。
+
+在设备代码中声明的自动变量，如果不带{\_}{\_}device{\_}{\_}、{\_}{\_}shared{\_}{\_}和{\_}{\_}constant{\_}{\_}限定符中的任何一个时通常位于寄存器中。但在某些情况下，编译器可能选择将其置于本地存储器中，这将带来性能损耗，详见\ref{sec:devicememaccess}。
+
+\subsection{ {\_}{\_}device{\_}{\_}}
+
+{\_}{\_}device{\_}{\_} 限定符声明位于设备上的变量。
+
+在接下来的三节中介绍的其他类型限定符中，最多只能有一种可与{\_}{\_}device{\_}{\_} 限定符一起使用，具体地指定变量属于哪个存储器空间。如果未出现任何限定符，则变量具有以下特征：
+\begin{itemize}
+\item 位于全局存储器空间中；
+\item 与应用程序具有相同的生命周期；
+\item 网格内的所有线程都可访问，主机也可通过运行时库访问(运行时API中的cudaGetSymbolAddress() / cudaGetSymbolSize() / cudaMemcpyToSymbol() / cudaMemcpyFromSymbol()函数和驱动API中的 cuModuleGetGlobal()函数)。
+\end{itemize}
+
+\subsection{ {\_}{\_}constant{\_}{\_}}
+
+{\_}{\_}constant{\_}{\_} 限定符可与 {\_}{\_}device{\_}{\_} 限定符一起使用，此时{\_}{\_}device{\_}{\_}是可选的，所声明的变量具有以下特征：
+\begin{itemize}
+\item 位于常量存储器空间中；
+\item 与应用程序具有相同的生命周期；
+\item 网格内的所有线程都可访问，主机也可通过运行时库访问(运行时API中的cudaGetSymbolAddress() / cudaGetSymbolSize() / cudaMemcpyToSymbol() / cudaMemcpyFromSymbol()函数和驱动API中的cuModuleGetGlobal()函数)。
+\end{itemize}
+
+\subsection{{\_}{\_}shared{\_}{\_}}
+
+{\_}{\_}shared{\_}{\_} 限定符可与 {\_}{\_}device{\_}{\_} 限定符一起使用，此时{\_}{\_}device{\_}{\_}是可选的，所声明的变量具有以下特征：
+\begin{itemize}
+\item 位于线程块的共享存储器空间中；
+\item 与块具有相同的生命周期；
+\item 只可通过块内的所有线程访问。
+\end{itemize}
+
+将共享存储器中的变量声明为动态数组时，例如：
+\begin{lstlisting}
+extern __shared__ float shared[];
+\end{lstlisting}
+数组的大小将在启动时确定（参见\ref{sec:executionconfiguration}）。所有变量均以这种形式声明，在存储器中的同一地址开始，因此数组中的变量布局必须通过偏移显式管理。例如，如果一名用户希望在动态分配的共享存储器内获得与以下代码对应的内容：
+\begin{lstlisting}
+short array0[128];
+float array1[64];
+int   array2[256];
+\end{lstlisting}
+
+在动态分配的共享存储器，可以通过下面的方式声明和初始化：
+\begin{lstlisting}
+extern __shared__ float array[];
+__device__ void func() 
+{
+    short* array0 = (short*)array; 
+    float* array1 = (float*)&array0[128];
+    int*   array2 =   (int*)&array1[64];
+}
+\end{lstlisting}
+
+要注意指针要对齐到它指向的类型，所以下面的代码不能工作，因为array1没有对齐到4字节。
+
+\begin{lstlisting}
+extern __shared__ float array[];
+__device__ void func() 
+{
+    short* array0 = (short*)array; 
+    float* array1 = (float*)&array0[127];
+}
+\end{lstlisting}
+
+\subsection{{\_}{\_}restrict{\_}{\_}}
+\label{sec:restrictpointer}
+nvcc通过{\_}{\_}restrict{\_}{\_}关键字支持受限的（restricted）指针。
+
+C99中引入受限的指针是为了缓解C风格代码中的指针别名问题，别名阻碍了从代码重组到子表达式删除等各种优化。
+
+下面是一个别名问题的例子，使用受限指针能够帮助编译器减少指令数：
+
+\begin{lstlisting}
+void foo(const float* a,
+         const float* b,
+         float* c)
+{
+    c[0] = a[0] * b[0];
+    c[1] = a[0] * b[0];
+    c[2] = a[0] * b[0] * a[1];
+    c[3] = a[0] * a[1];
+    c[4] = a[0] * b[0];
+    c[5] = b[0];
+    ...
+}
+\end{lstlisting}
+
+
+在C风格代码中，指针a,b和c可能有别名，所以任何通过c的写操作都可能修改a或b的元素。这意味着为了保证功能正确性，编译器不能将a[0]和b[0]载入寄存器相乘，然后将结果存入c[0]和c[1]，因为如果说a[0]和c[0]是同一个位置的话，从抽象执行模型来看结果可能不一样。因此编译器不能利用常见的子表达式。类似地，编译器不能只是重排c[4]为c[0]和c[1]的计算，因为前面C[3]的写入可能改变C[4]的读入。
+
+通过将a,b和c指定为受限的指针，程序员断言这些指针是没有别名的，这意味着对c写入不会重写a或b的元素。这将函数原型改成下面的样子：
+
+\begin{lstlisting}
+void foo(const float* __restrict__ a,
+         const float* __restrict__ b,
+         float* __restrict__ c);
+\end{lstlisting}
+
+注意为了编译器优化所有的指针参数需要被声明为受限地。增加了{\_}{\_}restrict{\_}{\_}关键字，编译器现在能够任意重排和使用子表达式删除，同时保证功能一致。
+
+\begin{lstlisting}
+void foo(const float* __restrict__ a,
+         const float* __restrict__ b,
+         float* __restrict__ c)
+{
+    float t0 = a[0];
+    float t1 = b[0];
+    float t2 = t0 * t2;
+    float t3 = a[1];
+    c[0] = t2;
+    c[1] = t2;
+    c[4] = t2;
+    c[2] = t2 * t3;
+    c[3] = t0 * t3;
+    c[5] = t1;
+    ...
+}
+\end{lstlisting}
+
+这减少了访存次数和计算量。这同时也增加了寄存器压力，使用寄存器以缓存负载和公共子表达式。
+
+因为对于很多CUDA代码来说，寄存器压力是一个重要的问题，使用受限指针产生的负作用就是可能减小了占用率，这可能降低性能。
+
+\section{内置变量类型}
+\label{sec:bulti-in}
+
+\subsection{char1、uchar1、char2、uchar2、char3、uchar3、char4、uchar4、short1、ushort1、short2、ushort2、short3、ushort3、short4、ushort4、int1、uint1、int2、uint2、int3、uint3、int4、uint4、long1、ulong1、long2、ulong2、long3、ulong3、long4、ulong4、float1、float2、float3、float4、double2}
+\label{sec:vectortype}
+这些向量类型继承自基本整形和浮点类型。它们均为结构体，第 1、2、3、4 个组件分别可通过字段 x、y、z 和 w 访问。它们均附带形式为 $make_<type name>$ 的构造函数，示例如下：
+
+\begin{lstlisting}
+int2 make_int2(int x, int y);
+\end{lstlisting}
+
+这将创建一个类型为 int2 的向量，值为 (x, y)。
+
+在主机代码中，这些向量类型的对齐要求等于它们的基本类型的对齐要求。但是设备上的情况有时会有不同。详见\ref{tab:aligneRequirement}。
+
+
+\begin{table}[htbp]
+\caption{内置类型的对齐要求}
+\begin{tabular}
+{|p{213pt}|p{212pt}|}
+\hline
+Type & 
+Alignment  \\
+\hline
+char1, uchar1 & 
+1  \\
+\hline
+char2, uchar2 & 
+2  \\
+\hline
+char3, uchar3 & 
+1  \\
+\hline
+char4, uchar4 & 
+4  \\
+\hline
+short1, ushort1 & 
+2  \\
+\hline
+short2, ushort2 & 
+4  \\
+\hline
+short3, ushort3 & 
+2  \\
+\hline
+short4, ushort4 & 
+8  \\
+\hline
+int1, uint1 & 
+4  \\
+\hline
+int2, uint2 & 
+8  \\
+\hline
+int3, uint3 & 
+4  \\
+\hline
+int4, uint4 & 
+16  \\
+\hline
+long1, ulong1 & 
+如果sizeof(long) == sizeof(int),4;否则8 \\
+\hline
+long2, ulong2 & 
+如果sizeof(long) == sizeof(int),8;否则16 \\
+\hline
+long3, ulong3 & 
+如果sizeof(long) == sizeof(int),4;否则8 \\
+\hline
+long4, ulong4 & 
+16 \\
+\hline
+longlong1 & 
+8  \\
+\hline
+longlong2 & 
+16  \\
+\hline
+float1 & 
+4  \\
+\hline
+float2 & 
+8  \\
+\hline
+float3 & 
+4  \\
+\hline
+float4 & 
+16  \\
+\hline
+double1 & 
+8  \\
+\hline
+\end{tabular}
+\label{tab:aligneRequirement}
+\end{table}
+
+\subsection{dim3类型}
+\label{sec:dim3}
+此类型是一种整形向量类型，基于用于指定维度的 uint3。在定义类型为 dim3 
+的变量时，未指定的任何组件都将初始化为 1。
+
+\section{内置变量}
+
+内置类型指定块和网格的尺寸及块和线程索引，它们只在在设备上执行的函数内有效。
+
+\subsection{gridDim}
+
+此变量的类型为 dim3（参见\ref{sec:dim3}），包含网格的维度。
+
+\subsection{blockIdx}
+
+此变量的类型为 uint3（参见\ref{sec:vectortype}），包含网格内的块索引。
+
+\subsection{blockDim}
+
+此变量的类型为 dim3（参见\ref{sec:dim3}），包含块的维度。
+
+\subsection{threadIdx}
+
+此变量的类型为 uint3（参见第\ref{sec:vectortype}），包含块内的线程索引。
+
+\subsection{warpSize}
+
+此变量的类型为 int，包含以线程为单位的 warp 块大小。
+
+\section{存储器栅栏函数}
+\label{sec:memfence}
+
+\begin{lstlisting}
+void __threadfence_block();
+\end{lstlisting}
+等待直到在此函数调用前的所有全局存储器和共享存储器访问对块内所有线程可见。
+
+\begin{lstlisting}
+void __threadfence();
+\end{lstlisting}
+等待直到在此函数调用前的所有全局存储器和共享存储器访问对下列线程可见：
+\begin{itemize}
+\item 对于共享存储器，对块内所有线程，
+\item 对于全局存储器，对设备上的所有线程可见。
+\end{itemize}
+
+\begin{lstlisting}
+void __threadfence_system();
+\end{lstlisting}
+等待直到在此函数调用前的所有全局存储器和共享存储器访问对下列线程可见：
+\begin{itemize}
+\item 对于共享存储器，对块内所有线程可见，
+\item 对于全局存储器，对设备上的所有线程可见，
+\item 分页锁定主机存储器，对主机线程可见（参见\ref{sec:pagelocked}）。
+\end{itemize}
+{\_}{\_}threadfence{\_}system()只支持计算能力2.x的设备。
+
+一般，当一线程发射一系列特殊顺序的写存储器指令，其它线程看到的存储器写顺序不同，{\_}{\_}threadfence{\_}block()，{\_}{\_}threadfence()和{\_}{\_}threadfence{\_}system()可用于保证顺序。
+
+一个用处是当线程消费其它线程生产的数据时，就如下面的代码描述的一个内核在一次调用中计算一个N个数的数组的和。每个块先计算数组的一部分并将结果存储到全局存储器。当所有的块都完成后，最后一个块从全局存储器中读取部分和并将它们加和得到最终结果。为了决定那个块最后完成，每个块原子地递增计数器以通知计算完成并存储部分和（参见\ref{sec:atomic}了解原子函数）。最后一个块是得到计数器的值为gridDim.x-1的块。如果在存储部分和和递增计数器值时没有放置栅栏，计数器值可能在部分和存储之前增加了，这样最后一个块可能在部分和没有更新就开始读取部分和了。
+
+\lstinputlisting{bookSrc/sumwithmemfence.cu}
+
+\section{同步函数}
+\label{sec:synchronizefunction}
+
+\begin{lstlisting}
+void __syncthreads();
+\end{lstlisting}
+等待直到块内所有线程达到此同步点并且在此点之前所有的共享存储器和全局存储器访问对块内所有线程可见。
+
+{\_}syncthreads() 用于协调同一个块的线程之间的通信。在一个块内的某些线程访问共享或全局存储器中的相同地址时，部分访问操作可能存在写入后读取、读取后写入或写入后写入之类的风险。可通过在这些访问操作间同步线程来避免这些数据风险。
+
+{\_}syncthreads() 允许在条件代码中使用，但仅当条件估值在整个线程块中都相同时才允许使用，否则代码执行将有可能挂起，或者出现意料之外的副作用。
+
+计算能力2.x及以上的设备还支持下面三种{\_}{\_}syncthreads()的变体。
+
+\begin{lstlisting}
+int __syncthreads_count(int predicate);
+\end{lstlisting}
+等价于包含额外特性的{\_}{\_}syncthreads()，即为块内所有线程计算predicate并返回predicate值不是0的线程数目。
+
+\begin{lstlisting}
+int __syncthreads_and(int predicate);
+\end{lstlisting}
+等价于包含额外特性的{\_}{\_}syncthreads()，即为块内所有线程计算predicate并当且仅当所有线程的predicate值不是0才返回非零值。
+
+\begin{lstlisting}
+int __syncthreads_or(int predicate);
+\end{lstlisting}
+等价于包含额外特性的{\_}{\_}syncthreads()，即为块内所有线程计算predicate并只要有一个线程的predicate值不是零，返回的就是非零值。
+
+\section{数学函数}
+
+参考手册中列出了在设备代码中支持的所有标准C/C++库数学函数及内置函数。
+\ref{sec:mathfunction}提供了一些相关函数的精度信息。
+
+\section{纹理函数}
+\label{sec:texturefunctions}
+
+\subsection{纹理对象函数}
+\label{sec:textureobjfunctions}
+
+\subsubsection{tex1Dfetch()}
+
+\begin{lstlisting}
+template<class T>
+T tex1Dfetch(cudaTextureObject_t texObj,   int x);
+\end{lstlisting}
+
+使用整形坐标x获取一维纹理对象texObj指定的线性存储器。tex1Dfetch()只支持非归一化纹理坐标，因此只支持边界和钳位寻址模式。也不进行纹理滤波。对于整形，这些函数可选的将整形提升到单精度浮点型。
+
+\subsubsection{tex1D()}
+
+\begin{lstlisting}
+template<class T>
+T tex1D(cudaTextureObject texObj, float x);
+\end{lstlisting}
+使用浮点纹理坐标x获取一维纹理对象texObj指定的CUDA数组。
+
+\subsubsection{tex2D()}
+
+\begin{lstlisting}
+template<class DataType, enum cudaTextureReadMode readMode>
+Type tex2D(texture<DataType, cudaTextureType2D, readMode> texRef,
+           float x, float y);
+\end{lstlisting}
+使用纹理坐标x和y获取绑定到纹理引用texRef的CUDA数组或线性存储器区域。
+
+\subsubsection{tex3D()}
+
+\begin{lstlisting}
+template<class DataType, enum cudaTextureReadMode readMode>
+Type tex3D(texture<DataType, cudaTextureType3D, readMode> texRef,
+           float x, float y, float z);
+\end{lstlisting}
+使用纹理坐标x,y和z获取绑定到texRef的CUDA数组。
+
+\subsubsection{tex1DLayered()}
+\label{sec:1dlayer}
+\begin{lstlisting}
+template<class DataType, enum cudaTextureReadMode readMode>
+Type tex1DLayered(
+     texture<DataType, cudaTextureType1DLayered, readMode> texRef,
+     float x, int layer);
+\end{lstlisting}
+使用纹理坐标x和索引layer获取绑定到一维层次纹理引用texRef的CUDA数组。
+
+\subsubsection{tex2DLayered()}
+\label{sec:2dlayer}
+\begin{lstlisting}
+template<class DataType, enum cudaTextureReadMode readMode>
+Type tex2DLayered(
+     texture<DataType, cudaTextureType2DLayered, readMode> texRef,
+     float x, float y, int layer);
+\end{lstlisting}
+使用纹理坐标x、y和索引layer获取绑定到二维层次纹理引用texRef的CUDA数组
+
+\subsubsection{texCubemap()}
+\label{sec:texcubemap}
+\begin{lstlisting}
+template<class DataType, enum cudaTextureReadMode readMode>
+Type texCubemap(
+     texture<DataType, cudaTextureTypeCubemap, readMode> texRef,
+     float x, float y, float z);
+\end{lstlisting}
+使用纹理坐标x,y和z获取绑定到立方位图纹理引用的CUDA数组。
+
+\subsubsection{texCubemapLayered()}
+\label{sec:cubemaplayer}
+\begin{lstlisting}
+template<class DataType, enum cudaTextureReadMode readMode>
+Type texCubemapLayered(
+texture<DataType, cudaTextureTypeCubemapLayered, readMode> texRef,
+float x, float y, float z, int layer);
+\end{lstlisting}
+使用三维纹理坐标x,y和z及索引layer获取绑定到层次立方位图纹理引用的CUDA数组。
+
+\subsubsection{tex2Dgather()}
+\begin{lstlisting}
+template<class DataType, enum cudaTextureReadMode readMode>
+Type tex2Dgather(
+     texture<DataType, cudaTextureType2D, readMode> texRef,
+     float x, float y, int comp = 0);
+\end{lstlisting}
+使用纹理坐标x,y获取绑定到纹理引用的CUDA数组，并返回其第comp个分量组成的向量。
+
+
+\subsection{纹理参考函数}
+
+\subsubsection{tex1Dfetch()}
+
+\begin{lstlisting}
+template<class DataType>
+Type tex1Dfetch(
+   texture<DataType, cudaTextureType1D,
+           cudaReadModeElementType> texRef,
+   int x);
+
+float tex1Dfetch(
+   texture<unsigned char, cudaTextureType1D,
+           cudaReadModeNormalizedFloat> texRef,
+   int x);
+
+float tex1Dfetch(
+   texture<signed char, cudaTextureType1D,
+           cudaReadModeNormalizedFloat> texRef,
+   int x);
+
+float tex1Dfetch(
+   texture<unsigned short, cudaTextureType1D,
+           cudaReadModeNormalizedFloat> texRef,
+   int x);
+
+float tex1Dfetch(
+   texture<signed short, cudaTextureType1D,
+           cudaReadModeNormalizedFloat> texRef,
+   int x);
+\end{lstlisting}
+
+使用整形坐标获取绑定到纹理引用texRef的线性存储器。不支持纹理过滤和寻址模式。对于整形，这些函数可选的将整形提升到单精度浮点型。
+
+除了上面的函数，也支持二元组和四元组；例如：
+\begin{lstlisting}
+float4 tex1Dfetch(
+   texture<uchar4, cudaTextureType1D,
+           cudaReadModeNormalizedFloat> texRef,
+   int x);
+\end{lstlisting}
+使用纹理坐标x获取绑定到texRef的线性存储器区域。
+
+\subsubsection{tex1D()}
+
+\begin{lstlisting}
+template<class DataType, enum cudaTextureReadMode readMode>
+Type tex1D(texture<DataType, cudaTextureType1D, readMode> texRef,
+           float x);
+\end{lstlisting}
+使用浮点纹理坐标x获取绑定到纹理引用texRef的CUDA数组。
+
+\subsubsection{tex2D()}
+
+\begin{lstlisting}
+template<class DataType, enum cudaTextureReadMode readMode>
+Type tex2D(texture<DataType, cudaTextureType2D, readMode> texRef,
+           float x, float y);
+\end{lstlisting}
+使用纹理坐标x和y获取绑定到纹理引用texRef的CUDA数组或线性存储器区域。
+
+\subsubsection{tex3D()}
+
+\begin{lstlisting}
+template<class DataType, enum cudaTextureReadMode readMode>
+Type tex3D(texture<DataType, cudaTextureType3D, readMode> texRef,
+           float x, float y, float z);
+\end{lstlisting}
+使用纹理坐标x,y和z获取绑定到texRef的CUDA数组。
+
+\subsubsection{tex1DLayered()}
+\begin{lstlisting}
+template<class DataType, enum cudaTextureReadMode readMode>
+Type tex1DLayered(
+     texture<DataType, cudaTextureType1DLayered, readMode> texRef,
+     float x, int layer);
+\end{lstlisting}
+使用纹理坐标x和索引layer获取绑定到一维层次纹理引用texRef的CUDA数组。
+
+\subsubsection{tex2DLayered()}
+\begin{lstlisting}
+template<class DataType, enum cudaTextureReadMode readMode>
+Type tex2DLayered(
+     texture<DataType, cudaTextureType2DLayered, readMode> texRef,
+     float x, float y, int layer);
+\end{lstlisting}
+使用纹理坐标x、y和索引layer获取绑定到二维层次纹理引用texRef的CUDA数组
+
+\subsubsection{texCubemap()}
+\begin{lstlisting}
+template<class DataType, enum cudaTextureReadMode readMode>
+Type texCubemap(
+     texture<DataType, cudaTextureTypeCubemap, readMode> texRef,
+     float x, float y, float z);
+\end{lstlisting}
+使用纹理坐标x,y和z获取绑定到立方位图纹理引用的CUDA数组。
+
+\subsubsection{texCubemapLayered()}
+\begin{lstlisting}
+template<class DataType, enum cudaTextureReadMode readMode>
+Type texCubemapLayered(
+texture<DataType, cudaTextureTypeCubemapLayered, readMode> texRef,
+float x, float y, float z, int layer);
+\end{lstlisting}
+使用三维纹理坐标x,y和z及索引layer获取绑定到层次立方位图纹理引用的CUDA数组。
+
+\subsubsection{tex2Dgather()}
+\begin{lstlisting}
+template<class DataType, enum cudaTextureReadMode readMode>
+Type tex2Dgather(
+     texture<DataType, cudaTextureType2D, readMode> texRef,
+     float x, float y, int comp = 0);
+\end{lstlisting}
+使用纹理坐标x,y获取绑定到纹理引用的CUDA数组，并返回其第comp个分量组成的向量。
+
+\section{表面函数(surface)}
+\label{sec:surfacefunctions}
+
+只能计算能力2.0及以上的设备才支持表面函数。
+
+\ref{sec:surfobj}描述了表面对象，\ref{sec:surfref}描述了表面引用。
+
+本节，boundaryMode 指明边界模式，边界模式指定了越界的表面坐标如何处理；其可选值有cudaBondaryModeClamp，此时越界坐标被钳位到有效坐标内；cudaBondaryModeZero，此时越界读返回，越界写被忽略；cudaBondaryModeTrap，此时越界读写导致内核崩溃。
+\subsection{表面对象函数}
+\label{sec:surfobj}
+
+\subsubsection{surf1Dread()}
+
+\begin{lstlisting}
+template<class T>
+T surf1Dread(cudaSurfaceObject surfObj, int x,
+               boundaryMode = cudaBoundaryModeTrap);
+\end{lstlisting}
+使用坐标x读取表面对象surfObj指定的CUDA数组。
+
+\subsubsection{surf1Dwrite()}
+
+\begin{lstlisting}
+template<class T>
+void surf1Dwrite(T data,
+                  cudaSurfaceObject surfObj,
+                  int x,
+                  boundaryMode = cudaBoundaryModeTrap);
+\end{lstlisting}
+将值data写入一维表面对象sufObj指定的存储器位置x。
+
+\subsubsection{surf2Dread()}
+
+\begin{lstlisting}
+template<class T>
+T surf2Dread(cudaSurfaceObject surfObj,
+              int x, int y,
+              boundaryMode = cudaBoundaryModeTrap);
+template<class T>
+void surf2Dread(T* data,
+                 cudaSurfaceObject surfObj,
+                 int x, int y,
+                 boundaryMode = cudaBoundaryModeTrap);
+\end{lstlisting}
+使用坐标x,y读取二维表面对象指定的CUDA数组的值。
+
+\subsubsection{surf2Dwrite()}
+
+\begin{lstlisting}
+template<class T>
+void surf2Dwrite(T data,
+                  cudaSurfaceObject surfObj,
+                  int x, int y,
+                  boundaryMode = cudaBoundaryModeTrap);
+\end{lstlisting}
+将data写入二维表面对象surfObj指定的表面存储器位置x,y。
+
+\subsubsection{surf3Dread()}
+\begin{lstlisting}
+template<class T>
+T surf3Dread(cudaSurfaceObject surfObj,
+              int x, int y, int z,
+              boundaryMode = cudaBoundaryModeTrap);
+template<class T>
+void surf3Dread(T* data,
+                 cudaSurfaceObject surfObj,
+                 int x, int y, int z,
+                 boundaryMode = cudaBoundaryModeTrap);
+\end{lstlisting}
+使用坐标x、y和z读取三维表面对象指定的CUDA数组。
+
+\subsubsection{surf3Dwrite()}
+\begin{lstlisting}
+template<class T>
+void surf3Dwrite(T data,
+                  cudaSurfaceObject surfObj,
+                  int x, int y, int z,
+                  boundaryMode = cudaBoundaryModeTrap);
+\end{lstlisting}
+将值data写入三维表面对象指定的CUDA数组位置x,y,z。
+
+\subsubsection{surf1DLayeredread()}
+\begin{lstlisting}
+template<class T>
+T surf1DLayeredread(
+                 cudaSurfaceObject surfObj,
+                 int x, int layer,
+                 boundaryMode = cudaBoundaryModeTrap);
+template<class T>
+void surf1DLayeredread(T data,
+                 cudaSurfaceObject surfObj,
+                 int x, int layer,
+                 boundaryMode = cudaBoundaryModeTrap);
+\end{lstlisting}
+使用索引layer和坐标x读取一维层次表面对象surfObj指定的CUDA数组。
+
+\subsubsection{surf1DLayeredwrite()}
+\begin{lstlisting}
+template<class Type>
+void surf1DLayeredwrite(T data,
+                 cudaSurfaceObject surfObj,
+                 int x, int layer,
+                 boundaryMode = cudaBoundaryModeTrap);
+\end{lstlisting}
+将值data写入一维层次表面对象surfObj指定的CUDA数组的layer层，坐标x位置。
+
+\subsubsection{surf2DLayeredread()}
+\begin{lstlisting}
+template<class T>
+T surf2DLayeredread(
+                 cudaSurfaceObject surfObj,
+                 int x, int y, int layer,
+                 boundaryMode = cudaBoundaryModeTrap);
+template<class T>
+void surf2DLayeredread(T data,
+                         cudaSurfaceObject surfObj,
+                         int x, int y, int layer,	
+                         boundaryMode = cudaBoundaryModeTrap);
+\end{lstlisting}
+使用索引layer和坐标x读取二维层次表面对象surfObj指定的CUDA数组。
+
+\subsubsection{surf2DLayeredwrite()}
+\begin{lstlisting}
+template<class T>
+void surf2DLayeredwrite(T data,
+                          cudaSurfaceObject surfObj,
+                          int x, int y, int layer,
+                          boundaryMode = cudaBoundaryModeTrap);
+\end{lstlisting}
+使用索引layer和坐标x,y将值data写入二维层次表面对象surfObj指定的CUDA数组。
+
+\subsubsection{surfCubemapread()}
+\begin{lstlisting}
+template<class T>
+T surfCubemapread(
+                 cudaSurfaceObject surfObj,
+                 int x, int y, int face,
+                 boundaryMode = cudaBoundaryModeTrap);
+template<class T>
+void surfCubemapread(T data,
+                 cudaSurfaceObject surfObj,
+                 int x, int y, int face,
+                 boundaryMode = cudaBoundaryModeTrap);
+\end{lstlisting}
+使用坐标x,y和面索引face读取立方位图表面对象surfObj指定的CUDA数组。
+
+\subsubsection{surfCubemapwrite()}
+\begin{lstlisting}
+template<class T>
+void surfCubemapwrite(T data,
+                 cudaSurfaceObject surfObj,
+                 int x, int y, int face,
+                 boundaryMode = cudaBoundaryModeTrap);
+\end{lstlisting}
+使用面索引face和坐标x,y将值data写入立方位图表面对象指定的CUDA数组。
+
+\subsubsection{surfCubemapLayeredread()}
+\begin{lstlisting}
+template<class T>
+T surfCubemapLayeredread(
+             cudaSurfaceObject surfObj,
+             int x, int y, int layerFace,
+             boundaryMode = cudaBoundaryModeTrap);
+template<class T>
+void surfCubemapLayeredread(T data,
+             cudaSurfaceObject surfObj,
+             int x, int y, int layerFace,
+             boundaryMode = cudaBoundaryModeTrap);
+\end{lstlisting}
+使用索引layerFace和坐标x,y读取层次立方位图表面对象surfObj指定的CUDA数组。
+
+\subsubsection{surfCubemapLayeredwrite()}
+\begin{lstlisting}
+template<class T>
+void surfCubemapLayeredwrite(T data,
+             cudaSurfaceObject surfObj,
+             int x, int y, int layerFace,
+             boundaryMode = cudaBoundaryModeTrap);
+\end{lstlisting}
+将值data写入层次立方位图表面对象surfObj指定的CUDA数组的layer层，坐标x,y位置。
+
+\subsection{表面引用API}
+\label{sec:surfref}
+
+\subsubsection{surf1Dread()}
+\begin{lstlisting}
+template<class Type>
+Type surf1Dread(surface<void, cudaSurfaceType1D> surfRef,
+                int x,
+                boundaryMode = cudaBoundaryModeTrap);
+template<class Type>
+void surf1Dread(Type data,
+                surface<void, cudaSurfaceType1D> surfRef,
+                int x,
+                boundaryMode = cudaBoundaryModeTrap);
+\end{lstlisting} 
+使用坐标x读取绑定到表面参考surfRef的CUDA数组。
+
+\subsubsection{surf1Dwrite()}
+\begin{lstlisting}
+template<class Type>
+void surf1Dwrite(Type data,
+                 surface<void, cudaSurfaceType1D> surfRef,
+                 int x,
+                 boundaryMode = cudaBoundaryModeTrap);
+\end{lstlisting}
+将值data写入绑定到sufRef的表面存储器位置x。
+
+\subsubsection{surf2Dread()}
+\begin{lstlisting}
+template<class Type>
+Type surf2Dread(surface<void, cudaSurfaceType2D> surfRef,
+                int x, int y,
+                boundaryMode = cudaBoundaryModeTrap);
+template<class Type>
+void surf2Dread(Type* data,
+                surface<void, cudaSurfaceType2D> surfRef,
+                int x, int y,
+                boundaryMode = cudaBoundaryModeTrap);
+\end{lstlisting} 
+读取绑定的surfRef的表面存储器位置x，y的值。
+
+\subsubsection{surf2Dwrite()}
+\begin{lstlisting}
+template<class Type>
+void surf3Dwrite(Type data,
+                 surface<void, cudaSurfaceType3D> surfRef,
+                 int x, int y, int z,
+                 boundaryMode = cudaBoundaryModeTrap);
+\end{lstlisting}
+将data写入绑定到surfRef的表面存储器位置x,y。
+
+\subsubsection{surf3Dread()}
+\begin{lstlisting}
+template<class Type>
+Type surf3Dread(surface<void, cudaSurfaceType3D> surfRef,
+                int x, int y, int z,
+                boundaryMode = cudaBoundaryModeTrap);
+template<class Type>
+void surf3Dread(Type* data,
+                surface<void, cudaSurfaceType3D> surfRef,
+                int x, int y, int z,
+                boundaryMode = cudaBoundaryModeTrap);
+\end{lstlisting}
+使用纹理坐标x,y,z读取绑定到三维表面引用surfRef的CUDA数组。
+
+\subsubsection{surf3Dwrite()}
+\begin{lstlisting}
+template<class Type>
+void surf3Dwrite(Type data,
+                 surface<void, cudaSurfaceType3D> surfRef,
+                 int x, int y, int z,
+                 boundaryMode = cudaBoundaryModeTrap);
+\end{lstlisting}
+将值data写入三维表面引用surfRef绑定的CUDA数组位置x,y,z。
+
+\subsubsection{surf1DLayeredread()}
+\begin{lstlisting}
+template<class Type>
+Type surf1DLayeredread(
+                surface<void, cudaSurfaceType1DLayered> surfRef,
+                int x, int layer,
+                boundaryMode = cudaBoundaryModeTrap);
+template<class Type>
+void surf1DLayeredread(Type* data,
+                surface<void, cudaSurfaceType1DLayered> surfRef,
+                int x, int layer,
+                boundaryMode = cudaBoundaryModeTrap);
+\end{lstlisting}
+使用层索引layer和坐标x读取绑定到表面引用surfRef的CUDA数组。
+
+\subsubsection{surf1DLayeredwrite()}
+\begin{lstlisting}
+template<class Type>
+void surf1DLayeredwrite(Type data,
+                surface<void, cudaSurfaceType1DLayered> surfRef,
+                int x, int layer,
+                boundaryMode = cudaBoundaryModeTrap);
+\end{lstlisting}
+使用索引layer和坐标x，将值data写入绑定到一维层次表面引用surfRef的CUDA数组。
+
+\subsubsection{surf2DLayeredread()}
+\begin{lstlisting}
+template<class Type>
+Type surf2DLayeredread(
+                surface<void, cudaSurfaceType2DLayered> surfRef,
+                int x, int y, int layer,
+                boundaryMode = cudaBoundaryModeTrap);
+template<class Type>
+void surf2DLayeredread(Type* data,
+                surface<void, cudaSurfaceType2DLayered> surfRef,
+                int x, int y, int layer,
+                boundaryMode = cudaBoundaryModeTrap);
+\end{lstlisting}
+使用索引layer和坐标x,y读取绑定到表面引用surfRef的CUDA数组。
+
+\subsubsection{surf2DLayeredwrite()}
+\begin{lstlisting}
+template<class Type>
+void surf2DLayeredwrite(Type data,
+                surface<void, cudaSurfaceType2DLayered> surfRef,
+                int x, int y, int layer,
+                boundaryMode = cudaBoundaryModeTrap);
+\end{lstlisting}
+将值data写入二维层次表面引用绑定的CUDA数组的layer层，坐标x,y。
+
+\subsubsection{surfCubemapread()}
+\begin{lstlisting}
+template<class Type>
+Type surfCubemapread(
+                surface<void, cudaSurfaceTypeCubemap> surfRef,
+                int x, int y, int face,
+                boundaryMode = cudaBoundaryModeTrap);
+template<class Type>
+void surfCubemapread(Type* data,
+                surface<void, cudaSurfaceTypeCubemap> surfRef,
+                int x, int y, int face,
+                boundaryMode = cudaBoundaryModeTrap);
+\end{lstlisting}
+使用面索引face和坐标x,y读取绑定到立方位图表面引用的CUDA数组。
+
+\subsubsection{surfCubemapwrite()}
+\begin{lstlisting}
+template<class Type>
+void surfCubemapwrite(Type data,
+                surface<void, cudaSurfaceTypeCubemap> surfRef,
+                int x, int y, int face,
+                boundaryMode = cudaBoundaryModeTrap);
+\end{lstlisting}
+将值data写入到绑定到立方位图表面引用的CUDA数组，索引是layerFace，坐标x,y。
+
+\subsubsection{surfCubemapLayeredread()}
+\begin{lstlisting}
+template<class Type>
+Type surfCubemapLayeredread(
+            surface<void, cudaSurfaceTypeCubemapLayered> surfRef,
+            int x, int y, int layerFace,
+            boundaryMode = cudaBoundaryModeTrap);
+template<class Type>
+void surfCubemapLayeredread(Type data,
+            surface<void, cudaSurfaceTypeCubemapLayered> surfRef,
+            int x, int y, int layerFace,
+            boundaryMode = cudaBoundaryModeTrap);
+\end{lstlisting}
+使用索引layerFace和坐标x,y读取绑定到层次立方位图表面引用surfRef的CUDA数组。
+
+\subsubsection{surfCubemapLayeredwrite()}
+\begin{lstlisting}
+template<class Type>
+void surfCubemapLayeredwrite(Type data,
+            surface<void, cudaSurfaceTypeCubemapLayered> surfRef,
+            int x, int y, int layerFace,
+            boundaryMode = cudaBoundaryModeTrap);
+\end{lstlisting}
+使用索引layerFace和坐标x,y将值data写入绑定到层次立方位图表面引用surfRef的CUDA数组。
+
+\section{时间函数}
+\begin{lstlisting}
+clock_t clock();
+long long int clock64();
+\end{lstlisting}
+在设备代码中执行时，返回每个多处理器计数器的值，此计数器随每一次时钟周期而递增。在内核发射和结束时对此计数器取样，确定两次取样的差别，然后为每个线程记录下结果，这为各线程提供一种度量方法，可度量设备为了完全执行线程而占用的时钟周期数，但不是设备在执行线程指令时而实际使用的时钟周期数。前一个数字要比后一个数字大得多，因为线程是分时的。
+
+\section{原子函数}
+\label{sec:atomic}
+
+原子函数对位于全局存储器或共享存储器内的一个 32 位或 64 位字执行读取修改写入原子操作。例如，atomicAdd() 将在全局或共享存储器内的某个地址读取字，将其与一个整型相加，并将结果写回同一地址。说操作是原子的，是因为它的执行不受其他线程的干扰。换句话说，在操作完成前，其他任何线程都无法访问此地址。原子函数只能在设备代码中使用，而且从主机或其它设备的观点来看，作用在被映射分页锁定存储器（参见\ref{sec:mappedmem}）上的原子函数不是原子的。
+
+如\ref{sec:featureTech}所述，不同计算能力对原子函数的支持不同：
+\begin{itemize}
+\item 原子函数只在计算能力1.1或更高的设备上可用。
+\item 操作共享存储器中32位整型和全局存储器中64 位整型的原子函数只在计算能力为 1.2或更高的设备上可用。
+\item 操作共享存储器里的64位字的原子函数只在计算能力2.x的设备上可用。
+\item 唯有atomicExch()和atomicAdd()能够操作32位浮点数：
+\begin{itemize}
+\item 计算能力1.1及以上的设备，atomicExch()可以作用在全局存储器上。
+\item 计算能力1.2及以上的设备，atomicExch()可以作用在共享存储器上。
+\item 计算能力2.x及以上的设备，atomicAdd()可以作用在共享存储器和全局存储器上。
+\end{itemize}
+\end{itemize}
+
+注意：但是任何一个原子函数都可以基于atomicCAS()（比较并交换）实现。例如双精度的atomicAdd()实现如下：
+\begin{lstlisting}
+__device__ double atomicAdd(double* address, double val)
+{
+    unsigned long long int* address_as_ull =
+                              (unsigned long long int*)address;
+    unsigned long long int old = *address_as_ull, assumed;
+    do {
+        assumed = old;
+        old = atomicCAS(address_as_ull, assumed,
+                        __double_as_longlong(val +
+                               __longlong_as_double(assumed)));
+    } while (assumed != old);
+    return __longlong_as_double(old);
+}
+\end{lstlisting}
+
+\subsection{数学函数}
+
+\subsubsection{atomicAdd()}
+\begin{lstlisting}
+int atomicAdd(int* address, int val);
+unsigned int atomicAdd(unsigned int* address,
+                       unsigned int val);
+unsigned long long int atomicAdd(unsigned long long int* address,
+                                 unsigned long long int val);
+float atomicAdd(float* address, float val);
+\end{lstlisting}
+读取位于全局或共享存储器中地址 address 处的 32 位或 64 位字 old，计算 (old + val)，并将结果存储在存储器的同一地址中。这三项操作在一次原子事务中执行。该函数将返回old。
+
+浮点版本的atomAdd()只支持计算能力2.x及以上的设备。
+
+\subsubsection{atomicSub()}
+
+\begin{lstlisting}
+int atomicSub(int* address, int val);
+unsigned int atomicSub(unsigned int* address,
+                       unsigned int val);
+\end{lstlisting}
+读取位于全局或共享存储器中地址 address 处的 32 位字 old，计算 (old - val)，并将结果存储在存储器的同一地址中。这三项操作在一次原子事务中执行。该函数将返回old。
+
+\subsubsection{atomicExch()}
+
+\begin{lstlisting}
+int atomicExch(int* address, int val);
+unsigned int atomicExch(unsigned int* address,
+                        unsigned int val);
+unsigned long long int atomicExch(unsigned long long int* address,
+                                  unsigned long long int val);
+float atomicExch(float* address, float val);
+\end{lstlisting}
+读取位于全局或共享存储器中地址 address 处的 32 位或 64 位字 old，并将 val存储在存储器的同一地址中。这两项操作在一次原子事务中执行。该函数将返回 old。
+
+\subsubsection{atomicMin()}
+
+\begin{lstlisting}
+int atomicMin(int* address, int val);
+unsigned int atomicMin(unsigned int* address,
+                       unsigned int val);
+unsigned long long int atomicMin(unsigned long long int* address,
+                                 unsigned long long int val);
+\end{lstlisting}
+读取位于全局或共享存储器中地址 address 处的 32 位或64位字 old，计算 old 和 val 的最小值，并将结果存储在存储器的同一地址中。这三项操作在一次原子事务中执行。该函数将返回old。
+
+64位版本的acomicMin()只在计算能力3.5及以上的设备中得到支持。
+
+\subsubsection{atomicMax()}
+\begin{lstlisting}
+int atomicMax(int* address, int val);
+unsigned int atomicMax(unsigned int* address,
+                       unsigned int val);
+unsigned long long int atomicMax(unsigned long long int* address,
+                                 unsigned long long int val);
+\end{lstlisting}
+读取位于全局或共享存储器中地址 address 处的 32 位或64位字 old，计算 old 和 val 的最大值，并将结果存储在存储器的同一地址中。这三项操作在一次原子事务中执行。该函数将返回 old。
+
+64位版本的acomicMin()只在计算能力3.5及以上的设备中得到支持。
+
+\subsubsection{atomicInc()}
+
+\begin{lstlisting}
+unsigned int atomicInc(unsigned int* address,
+                       unsigned int val);
+\end{lstlisting}
+读取位于全局或共享存储器中地址 address 处的 32 位字 old，计算$ ((old >= val) ? 0 : (old+1))$，并将结果存储在存储器的同一地址中。这三项操作在一次原子事务中执行。该函数将返回 old。
+
+\subsubsection{atomicDec()}
+\begin{lstlisting}
+unsigned int atomicDec(unsigned int* address,
+                       unsigned int val);
+\end{lstlisting}
+读取位于全局或共享存储器中地址 address 处的 32 位字 old，计算$(old > val) ? val : (old-1)$，并将结果存储在存储器的同一地址中。这三项操作在一次原子事务中执行。该函数将返回 old。
+
+\subsubsection{atomicCAS()}
+\begin{lstlisting}
+int atomicCAS(int* address, int compare, int val);
+unsigned int atomicCAS(unsigned int* address,
+                       unsigned int compare,
+                       unsigned int val);
+unsigned long long int atomicCAS(unsigned long long int* address,
+                                 unsigned long long int compare,
+                                 unsigned long long int val);
+\end{lstlisting}
+读取位于全局或共享存储器中地址 address 处的 32 位或 64 位字 old，计算 $(old == compare ? val : old)$，并将结果存储在存储器的同一地址中。这三项操作在一次原子事务中执行。该函数将返回old（比较并交换）。
+
+\subsection{位逻辑函数}
+
+\subsubsection{atomicAnd()}
+
+\begin{lstlisting}
+int atomicAnd(int* address, int val);
+unsigned int atomicAnd(unsigned int* address,
+                       unsigned int val);
+unsigned long long int atomicAnd(unsigned long long int* address,
+                                 unsigned long long int val);
+\end{lstlisting}
+读取位于全局或共享存储器中地址 address 处的 32 位或64位字 old，计算$old\&val$，并将结果存储在存储器的同一地址中。这三项操作在一次原子事务中执行。该函数将返回 old。
+
+64位版本只在计算能力3.5及以上设备上得到支持。
+
+\subsubsection{atomicOr()}
+\begin{lstlisting}
+int atomicOr(int* address, int val);
+unsigned int atomicOr(unsigned int* address,
+                      unsigned int val);
+unsigned long long int atomicOr(unsigned long long int* address,
+                                unsigned long long int val);
+\end{lstlisting}
+
+读取位于全局或共享存储器中地址 address 处的 32 位或64位字 old，计算 $old|val$，并将结果存储在存储器的同一地址中。这三项操作在一次原子事务中执行。该函数将返回 old。
+
+64位版本只在计算能力3.5及以上设备上得到支持
+
+\subsubsection{atomicXor()}
+\begin{lstlisting}
+int atomicXor(int* address, int val);
+unsigned int atomicXor(unsigned int* address,
+                       unsigned int val);
+unsigned long long int atomicXor(unsigned long long int* address,
+                                 unsigned long long int val);
+\end{lstlisting}
+
+读取位于全局或共享存储器中地址 address 处的 32 位或64位字 old，计算 $old\otimes val$，并将结果存储在存储器的同一地址中。这三项操作在一次原子事务中执行。该函数将返回old。
+
+64位版本只在计算能力3.5及以上设备上得到支持
+
+\section{束表决（warp vote）函数}
+\label{sec:warpvote}
+
+只有计算能力为 1.2 或更高的设备支持束表决（参见\ref{sec:simt}了解束的定义）函数。
+
+\begin{lstlisting}
+int __all(int predicate);
+\end{lstlisting}
+
+为束内的所有线程计算 predicate，当且仅当所有线程的 predicate均非零时返回非零值。
+
+\begin{lstlisting}
+int __any(int predicate);
+\end{lstlisting}
+
+为束内的所有线程计算 predicate，当且仅当任意线程的 predicate 非零时返回非零值。
+
+
+\begin{lstlisting}
+unsigned int __ballot(int predicate);
+\end{lstlisting}
+
+为束内所有线程计算predicate值，并返回一个整数，如果束内第N个线程的predicate值为非零，则该整数的第N位为1。计算能力为2.x及以上的设备支持此函数。
+
+\section{束洗牌函数}
+
+\_\_shfl、\_\_shfl\_up、\_\_shfl\_down和\_\_shfl\_xor在束内线程间交换变量值。
+
+这些函数只在计算能力3.x的设备中得到支持。
+
+\subsection{概览}
+
+\_\_shfl内置函数允许束内线程不使用共享存储器交换变量值。束内活跃线程同时发生每线程4字节的交换。8字节数的交换必须拆成两个\_\_shfl()调用。
+
+线程只能从另外一个参与\_\_shfl()的目标线程那里读取数据，如果目标线程并不参与交换，返回的数据未定义。
+
+\_\_shfl()内置函数有一个可选宽度参数，这个参数允许将束划分成片段-如以SIMD方式将束分成4组，每组8个线程交换数据。如果宽度小于warpSize，束的每个子组就像一个独立的从0索引开始的实体。线程只能和同一个子组内的线程交换数据。子组的宽度必须是2的幂，以保证束能够被均分。如果子组的宽度不是2的幂或大于warpSize，结果没有定义。
+
+\begin{lstlisting}
+int __shfl(int var, int srcLane, int width=warpSize);
+float __shfl(float var, int srcLane, int width=warpSize);
+\end{lstlisting}
+\_\_shfl()返回线程srcLane持有的var。如果srclane不在[0:width-1]范围内，返回调用线程自己的var值。
+
+\begin{lstlisting}
+int __shfl_up(int var, unsigned int delta, int width=warpSize);
+float __shfl_up(float var, unsigned int delta, int width=warpSize);
+\end{lstlisting}
+\_\_shfl\_up()返回线程索引为id的线程持有的var值，其中id等于调用线程的束索引减去delta。从效果上来说，就像是将var在束内上移了delta个线程。调用线程束索引小于delta的，其var不发生改变。
+
+\begin{lstlisting}
+int __shfl_down(int var, unsigned int delta, int width=warpSize);
+float __shfl_down(float var, unsigned int delta,int width=warpSize);
+\end{lstlisting}
+\_\_shfl\_down()返回线程索引为id的线程持有的var值，其中id等于调用线程的束索引加上delta。从效果上来说，就像是将var在束内下移了delta个线程。调用线程束索引大于warpSize-delta的，其var不发生改变。
+
+\begin{lstlisting}
+int __shfl_xor(int var, int laneMask, int width=warpSize);
+float __shfl_xor(float var, int laneMask, int width=warpSize);
+\end{lstlisting}
+\_\_shfl\_xor()返回线程索引为id的线程持有的var值，其中id等于调用线程的束索引异或laneMask。如果id不在[0:width-1]范围内，返回调用线程自己的var。
+
+\subsection{在束内广播一个值}
+
+\lstinputlisting{bookSrc/shfBroadcast.cu}
+
+\subsection{计算8个线程的前缀和}
+
+\lstinputlisting{bookSrc/shfscan8.cu}
+
+\subsection{束内求和}
+
+\lstinputlisting{bookSrc/shfsum.cu}
+
+\section{取样计数器函数}
+
+每个多处理器有一组十六个硬件计数器，应用可以调用{\_}{\_}prof{\_}trigger()函数使用一条指令递增计数器。
+
+\begin{lstlisting}
+void __prof_trigger(int counter);
+\end{lstlisting}
+
+索引为counter的每个多处理器的硬件计数器每束增加1，8号和15号计数器保留，应用不能使用。
+
+第一个多处理器的，1，..，7号计数器值可通过CUDA profiler取得，方式是在profiler.conf文件中列出prof{\_}trigger{\_}00，prof{\_}trigger{\_}01，..，prof{\_}trigger{\_}07，等等（详见profiler手册）。在每次内核调用前，所有的计数器重置（注意当应用通过CUDA调试器或CUDA profiler运行时(cuda-gdb, CUDA Visual Profiler, Parallel Nsight)，所有的发射都是同步的）。
+
+\section{断言}
+
+断言只在计算能力2.x及以上的设备中得到支持。
+\begin{lstlisting}
+void assert(int expression);
+\end{lstlisting}
+如果expression等于0，停止内核执行。如果程序在调试器内执行，这将先激发一个断点，调试器就可以探查设备的当前状态。否则在调用cudaDeviceSynchronize()、cudaStreamSynchronize()或cudaEventsSynchronize()之后，所有expression为0的线程将会向标准错误流stderr打印一条消息。消息的格式如下：
+\begin{lstlisting}
+<filename>:<line number>:<function>:
+block: [blockId.x,blockId.x,blockIdx.z],
+thread: [threadIdx.x,threadIdx.y,threadIdx.z]
+Assertion `<expression>` failed.
+\end{lstlisting}
+任何随后作用在同一设备上的主机端同步调用将返回cudaErrorAssert。除非使用cudaDeviceReset()重新初始化设备，否则不能向此设备发送命令。
+
+如果expression不是0，内核执行不受影响。
+
+如下面的代码：
+\lstinputlisting{bookSrc/assert.cu}
+将输出：
+\begin{lstlisting}
+test.cu:19: void testAssert(): block: [0,0,0], thread: [0,0,0] Assertion `should_be_one` failed.
+\end{lstlisting}
+
+断言的目的是调试。它会降低性能，因此建议在产品代码中关闭它们。可通过在包含assert.h之前定义NDEBUG宏关闭。要注意expression不能包含副作用(如$++i > 0$)，否则关闭断言会影响代码的功能。
+
+\section{格式化输出}
+
+格式化输出只在计算能力2.x及以上的设备上可用。
+
+\begin{lstlisting}
+int printf(const char *format[, arg, ...]);
+\end{lstlisting}
+
+将内核中的数据格式化输出到主机端流。
+
+内核内printf函数和标准C库的printf函数非常相似，用户可参考主机手册对printf的详细说明。本质上，format传递的字符串中格式化参数被对应的参数替代后输出到主机流。下面列出了支持的格式化字符串。
+
+printf像其它任何的设备端函数一样在调用线程的上下文中被每个线程执行。在有多个线程的内核中，意味着直接调用，将会被每一个线程执行。主机流会出现输出字符串的多个版本，每个调用printf的线程一个版本。
+
+如果只有一个线程要输出数据，依赖程序员将输出限制在某个线程上。
+
+和标准C中printf返回打印字符的个数不同，CUDA的printf返回解析的参数个数。如果格式化字符串后没有参数，返回0；如果格式化字符串是NULL,返回-1；如果出现内部错误，返回-2。
+
+\subsection{格式化符号}
+\label{sec:formatSpecifiers}
+和标准C的printf一样，格式化符的形式如下：$\%[flags][width][.precision][size]type$
+
+支持下面的域：
+
+标签：'\#' ' ' '0' '+' '-'
+
+宽度：'*' '0-9'
+
+精确度：'0-9'
+
+尺寸：'h' 'l' 'll'
+
+类型：'{\%}cdiouxXpeEfgGaAs'
+
+注意CUDA的printf接受任何标签、宽度、精度、尺寸和类型的联用，而不管它们是否有效。也就是说"\%hd"会被接收而且printf会试图在参数列表的对应位置打印双精度变量。
+
+\subsection{限制}
+
+printf()最终在主机系统上格式化输出。这意味着格式化字符串必须能够被主机编译器和C库理解。尽量保证CUDA支持的格式化字符是最常用的主机的格式化字符的一个子集，但是它真实的表现依旧是依赖主机的。
+
+如\ref{sec:formatSpecifiers}描述的，prinf()接受任何有效标签和类型的联用。因为无法保证最终的格式化输出结果是有效的还是无效的。这导致了如果格式化字符串中包含了无效联用，其输出结果是没有定义的。
+
+除格式化字符串外，prinf()最多可接受32参数。超过此值的将会被忽略。
+
+由于在64位windows上，long类型的长度和其它平台不同（windows平台四个字节，其它64位平台八个字节）。在非windows 64位平台上编译的程序在windows 64位平台上执行，所用使用''{\%}ld''格式化字符的输出都崩溃。因此建议编译平台和执行平台一致以保证安全性。
+
+printf()的输出缓冲区在内核启动前设置成固定长度（参见\ref{sec:assocaiteHostapi}）。它是循环的，如果在内核执行时产生了过多的输出，旧的输出会被覆盖。只有在下列操作之一执行时会刷新：
+\begin{itemize}
+\item 通过$<<<,>>>$或cuLaunch()发射内核（启动开始和如果CUDA{\_}LAUNCH{\_}BLOCKING环境变量设置成1时启动结束），
+\item 通过cudaDeviceSynchronize(),cuCtxSynchronze(), cudaStreamSynchronize() cuStreamSynchronize() cudaEventSynchronize()或cudaEventSynchronize()的同步，
+\item 使用cudaMemcpy*()或cuMemcpy*()的阻塞版本的存储器复制，
+\item 通过cuModuleLoad()或cuModuleUnload()的模块加载和卸载，
+\item 通过cudaDeviceReset()或cuCtxDestroy()销毁上下文。
+\end{itemize}
+
+注意程序退出时，缓冲区不会自动刷新。用户须显式的调用cudaDeviceReset()或cuCtxDestroy。
+
+\subsection{相关的主机端API}
+\label{sec:assocaiteHostapi}
+下列API用于获得或设置用于传输printf()参数和内部元数据到主机的缓冲区大小（默认1M）:
+\begin{lstlisting}
+cudaDeviceGetLimit(size_t *size, cudaLimitPrintfFifoSize)
+cudaDeviceSetLimit(cudaLimitPrintfFifoSize, size_t size)
+\end{lstlisting}
+
+\subsection{例程}
+
+下面代码：
+\begin{lstlisting}
+    #include "stdio.h"
+
+// printf() is only supported
+// for devices of compute capability 2.0 and higher
+#if defined(__CUDA_ARCH__) && (__CUDA_ARCH__ < 200)
+    #define printf(f, ...) ((void)(f, __VA_ARGS__),0)
+#endif
+
+__global__ void helloCUDA(float f)
+{
+    printf("Hello thread %d, f=%f\n", threadIdx.x, f);
+}
+
+int main()
+{
+    helloCUDA<<<1, 5>>>(1.2345f);
+    cudaDeviceSynchronize();
+    return 0;
+}
+\end{lstlisting}
+输出：
+\begin{lstlisting}
+Hello thread 2, f=1.2345
+Hello thread 1, f=1.2345 
+Hello thread 4, f=1.2345 
+Hello thread 0, f=1.2345 
+Hello thread 3, f=1.2345
+\end{lstlisting}
+注意输出的行数和网格内启动的线程数有关。如同我们所希望的，全局值（如 float f）所有线程共享，本地值（如threadIdx.x） 每个线程都不同。
+
+下面的代码：
+\begin{lstlisting}
+     #include "stdio.h"
+
+// printf() is only supported
+// for devices of compute capability 2.0 and higher
+#if defined(__CUDA_ARCH__) && (__CUDA_ARCH__ < 200)
+    #define printf(f, ...) ((void)(f, __VA_ARGS__),0)
+#endif
+
+__global__ void helloCUDA(float f)
+{
+    if (threadIdx.x == 0)
+        printf("Hello thread %d, f=%f\n", threadIdx.x, f) ;
+}
+
+int main()
+{
+    helloCUDA<<<1, 5>>>(1.2345f);
+    cudaDeviceSynchronize();
+    return 0;
+}
+\end{lstlisting}
+输出：
+\begin{lstlisting}
+Hello thread 0, f=1.2345
+\end{lstlisting}
+
+if()语句用于限制在调用时那个线程调用printf(),因此只有一行输出。
+
+\section{动态全局存储器分配}
+
+只有计算能力2.x及以上的设备支持动态全局存储器分配。
+\begin{lstlisting}
+void* malloc(size_t size);
+void free(void* ptr);
+\end{lstlisting}
+动态分配和释放来自全局存储器中的固定尺寸的堆。
+
+\begin{lstlisting}
+void* memcpy(void* dest, const void* src, size_t size);
+\end{lstlisting}
+从src指向的地址拷贝size个字节到dest指向的地址。
+
+\begin{lstlisting}
+void* memset(void* ptr, int value, size_t size);
+\end{lstlisting}
+从ptr指向的地址开始赋值size个字节，每个字节设置成value。
+
+CUDA内核函数内的malloc()函数从设备堆中分配至少size字节，且返回指向已分配存储器的指针，如果没有足够的存储器以满足这次分配就返回NULL。返回的指针保证对齐到16字节边界。
+
+CUDA内核函数内的free()函数释放ptr指向的存储器，ptr必须由前面的malloc()调用返回。如果ptr是NULL，free()调用被忽略。在同一个ptr上重复调用free()，行为未定义。
+
+既定的CUDA线程通过malloc()分配的存储器在CUDA上下文生命期内都存在，或直到其被显式调用free()函数为止。它可以被其它的CUDA线程使用，即使是后面的内核启动中的线程。任何CUDA线程可以释放其它线程分配的存储器，但是要保证同一指针不会被释放多次。
+
+\subsection{堆存储器分配}
+
+设备存储器堆拥有固定的尺寸，在任何使用malloc()或free()的程序装载进上下文前，堆的尺寸必须指定。如果任何使用malloc()的程序没有显式的指定堆的尺寸，默认尺寸是8 M。
+
+下面的API获得或设置堆尺寸。
+\begin{lstlisting}
+cudaDeviceGetLimit(size_t* size, cudaLimitMallocHeapSize)
+cudaDeviceSetLimit(cudaLimitMallocHeapSize, size_t size)
+\end{lstlisting}
+
+堆尺寸保证至少size字节。cuCtxGetLimit()和cudaDeviceGetLimit()返回当前要求的堆尺寸。
+
+实际的堆存储器分配发生在模块被加载进上下文时，加载可以是显式的通过CUDA驱动API，也可以是隐式的通过CUDA运行时API。如果存储器分配失败，模块加载会产生CUDA{\_}ERROR{\_}SHARED{\_}OBJECT{\_}INIT{\_}FAILED错误。
+
+一旦模块加载已经发生堆尺寸就不能改变，也不能依据需要动态更改尺寸。
+
+为设备堆保留的存储器是通过主机端CUDA调用（如cudaMalloc()）分配的存储器的补充。
+
+\subsection{与设备存储器API的互操作}
+
+使用malloc()分配的存储器不能使用运行时（即调用任何来自\ref{sec:runtime}的函数释放设备存储器函数）释放。
+
+类似地，运行时（即调用任何来自\ref{sec:runtime}的分配设备存储器函数）分配的存储器不能使用free()释放。
+
+
+\subsection{例程}
+
+\subsubsection{每个线程的分配}
+
+下面的代码：
+\lstinputlisting{bookSrc/perthreadmalloc.cu}
+
+将输出：
+\begin{lstlisting}
+Thread 0 got pointer: 00057020
+Thread 1 got pointer: 0005708c
+Thread 2 got pointer: 000570f8
+Thread 3 got pointer: 00057164
+Thread 4 got pointer: 000571d0
+\end{lstlisting}
+
+注意每个线程怎样遇上malloc()命令和获得它自己的分配。（具体的指针值可能不同）
+
+\subsubsection{每个线程块的分配}
+
+\lstinputlisting{bookSrc/perblockmalloc.cu}
+
+
+\subsubsection{在内核启动之间持久的分配}
+
+\lstinputlisting{bookSrc/persistmalloc.cu}
+
+\section{执行配置}
+\label{sec:executionconfiguration}
+任何对 {\_}global{\_} 函数的调用都必须指定该调用的执行配置。执行配置定义将用于在该设备上执行函数的网格和块的维度，以及相关的流（参见\ref{sec:runtime}了解流的详细内容）。
+
+使用运行时API时，可通过在函数名称和括号参数列表之间插入$<<<Dg, Db, Ns, S>>>$形式的表达式来指定，其中：
+\begin{itemize}
+\item Dg 的类型为 dim3（参见\ref{sec:dim3}），指定网格的维度和大小，Dg.x * Dg.y 
+等于所发射的块数量；对于计算能力1.x的设备，Dg.z必须等于1；
+\item Db 的类型为 dim3（参见\ref{sec:dim3}），指定各块的维度和大小，Db.x * Db.y * Db.z 等于各块的线程数量；
+\item Ns 的类型为 size{\_}t，指定各块为此调用动态分配的共享存储器（除静态分配的存储器之外），这些动态分配的存储器可供声明为动态数组的其他任何变量使用（参见\ref{sec:shared}），Ns 是一个可选参数，默认值为 0；
+\item S 的类型为 cudaStream{\_}t，指定相关流；S 是一个可选参数，默认值为 0。
+\end{itemize}
+
+举例来说，一个函数的声明如下：
+\begin{lstlisting}
+__global__ void Func(float* parameter);
+\end{lstlisting}
+
+必须通过如下方法来调用此函数：
+\begin{lstlisting}
+Func<<< Dg, Db, Ns >>>(parameter);
+\end{lstlisting}
+
+执行配置的参数将在实际函数参数之前被求值，对于计算能力1.x的设备，通过共享存储器同时传递给设备。
+
+如果 Dg 或 Db 大于设备允许的最大值，对指定设备的最大值参看\ref{sec:cc}，或 Ns 大于设备上可用的共享存储器最大值减去静态分配、函数参数（为计算能力1.x）和执行配置所需的共享存储器数量，则函数将失败。
+
+\section{启动绑定}
+\label{sec:launchbound}
+
+如\ref{sec:multiprocessor}详细讨论的那样，内核使用的寄存器越少，常驻的线程和线程块可能就越多，这能够提升性能。
+
+因此，编译器会试探性的在保持寄存器溢出（参见\ref{sec:devicememaccess}）的前提下最小化寄存器使用和最小化指令数量。应用可以以启动绑定的形式提供额外的信息给编译器以辅助这种试探，启动绑定在定义内核函数时使用{\_}{\_}launch{\_}bounds{\_}{\_}()限定符指定。
+\begin{lstlisting}
+__global__ void
+__launch_bounds__(maxThreadsPerBlock, minBlocksPerMultiprocessor)
+MyKernel(...)
+{
+    ...
+}
+\end{lstlisting}
+\begin{itemize}
+\item maxThreadsPerBlock指定应用启动MyKernel内核时每个块内允许的最大线程数；它被编译成.maxntid PTX指令；
+\item minBlocksPerMultiprocessor是可选的，其指定每个多处理器最小常驻块数量；它被编译成.minnctapersm PTX指令。
+\end{itemize}
+
+如果指定了发射绑定，编译器从它们得到内核使用的寄存器的上限$L$，以保证minBlocksPerMultiprocessor个块，每个块内maxThreadsPerBlock线程能常驻多处理器（参见\ref{sec:hardwarethread}了解内核使用的寄存器数量和块分配的寄存器数量之间的关系）。编译器可以用以下方式优化寄存器的使用。
+\begin{itemize}
+\item 如果初始的寄存器用量超过$L$，编译器会减少它到等于或小于$L$，经常以使用本地存储器和/或增加指令数目为代价。
+\item 如果初始的寄存器用量小于$L$，
+\begin{itemize}
+\item 如果指定了maxThreadsPerBlock但minBlocksPerMultiprocessors没有，编译器使用maxThreadsPerBlock为n和n+1个常驻块确定寄存器用量限度（如\ref{sec:multiprocessor}的例子，少使用一个寄存器就为多一个常驻块提供了空间），然后像没有指定发射绑定一样应用相似的试探；
+\item 如果minBlocksPerMultiprocessor和maxThreadsPerBlock都指定，编译器可能增加寄存器使用以减少指令数量和更好的隐藏单线程指令延迟。
+\end{itemize}
+\end{itemize}
+如果每个块线程数量超过了maxThreadsPerBlock，内核发射将失败。
+
+为既定内核优化发射绑定依据主架构修订号变化。例子代码展示了怎样使用\ref{sec:appcompatibility}的{\_}{\_}CUDA{\_}ARCH宏解决这个问题。
+\begin{lstlisting}
+#define THREADS_PER_BLOCK          256
+#if __CUDA_ARCH__ >= 200
+    #define MY_KERNEL_MAX_THREADS  (2 * THREADS_PER_BLOCK)
+    #define MY_KERNEL_MIN_BLOCKS   3
+#else
+    #define MY_KERNEL_MAX_THREADS  THREADS_PER_BLOCK
+    #define MY_KERNEL_MIN_BLOCKS   2
+#endif
+
+// Device code
+__global__ void
+__launch_bounds__(MY_KERNEL_MAX_THREADS, MY_KERNEL_MIN_BLOCKS)
+MyKernel(...)
+{
+    ...
+}
+\end{lstlisting}
+
+通常，使用最大块内线程数量（{\_}{\_}launch{\_}bounds{\_}{\_}()的第一个参数指定）调用MyKernel，在执行配置时，倾向使用MY{\_}KERNEL{\_}MAX{\_}THREADS作为块内线程数：
+\begin{lstlisting}
+// Host code
+MyKernel<<<blocksPerGrid, MY_KERNEL_MAX_THREADS>>>(...);
+\end{lstlisting}
+
+但是这不会工作，因为如\ref{sec:appcompatibility}提到的{\_}{\_}CUDA{\_}ARCH并没有在主机代码中指定，所以即使{\_}{\_}CUDA{\_}ARCH大于200，MyKernel也会以每块256个线程发射。块内线程数应当以下面的方式确定：
+\begin{itemize}
+\item 或者在编译时使用不依赖{\_}{\_}CUDA{\_}ARCH{\_}{\_}的宏，如:
+\begin{lstlisting}
+// Host code
+MyKernel<<<blocksPerGrid, THREADS_PER_BLOCK>>>(...);
+\end{lstlisting}
+\item 或者在运行时基于计算能力
+\begin{lstlisting}
+// Host code
+cudaGetDeviceProperties(&deviceProp, device);
+int threadsPerBlock = (deviceProp.major >= 2 ? 2 * THREADS_PER_BLOCK : THREADS_PER_BLOCK);
+MyKernel<<<blocksPerGrid, threadsPerBlock>>>(...);
+\end{lstlisting}
+\end{itemize}
+使用ptxas-options=-v编译器选项可以报告寄存器用量。常驻块数量可从CUDA profiler中给出的占用率（参见\ref{sec:devicememaccess}了解占用率的定义）得到。
+
+对于{\_}{\_}global{\_}{\_}函数的寄存器用量也可以使用--maxrregcount编译器选项控制。对于启动绑定的函数，--maxrregcount值会被忽略。
+
+\section{\#pragma unroll}
+\label{sec:unroll}
+默认情况下，编译器将展开具有已知循环计数的小循环。{\#}pragma unroll 
+指令可用于控制任何给定循环的展开操作。它必须紧接于循环之前，而且仅应用于该循环。可选择性的在其后接一个数字（译者注：即使是宏也是不允许的，必须是字面数值），指定必须展开多少次循环。
+
+例如，在下面的代码示例中：
+\begin{lstlisting}
+#pragma unroll 5
+for (int i = 0; i < n; ++i)
+\end{lstlisting}
+循环将展开 5 
+次。程序员需要负责确保展开操作不会影响程序的正确性（在上面的示例中，如果 n 
+小于 5，则程序的正确性将受到影响）。
+
+{\#}pragma unroll 1 将阻止编译器展开一个循环。
+
+如果在 {\#}pragma unroll 后未指定任何数据，如果其循环计数为常数，则该循环将完全展开，否则将不会展开。
+
+\section{SIMD 视频指令}
+
+PTX指令集3.0引入了SIMD(单指令，多数据)视频指令，它能够操作一对16位值或4个8位值。这些指令在计算能力3.0的设备上可用。
+
+SIMD视频指令是：
+\begin{itemize}
+\item vadd2, vadd4
+\item vsub2, vsub4
+\item vavrg2, vavrg4
+\item vabsdiff2, vabsdiff4
+\item vmin2, vmin4
+\item vmax2, vmax4
+\item vset2, vset4
+\end{itemize}
+
+CUDA程序能够通过asm()语句包含PTX指令，比如SIMD视频指令。asm()语句的基本语法是：
+\begin{lstlisting}
+asm("template-string" : "constraint"(output) : "constraint"(input));
+\end{lstlisting}
+一个使用vabsdiff4指令的例子是：
+\begin{lstlisting}
+asm("vabsdiff4.u32.u32.u32.add" " %0, %1, %2, %3;": "=r" (result):"r" (A), "r" (B), "r" (C));
+\end{lstlisting}
+这使用vabsdiff4指令计算一个整型4字节SIMD绝对差的和。绝对差值通过使用SIMD方式计算无符号整型A和B的每个字节得到。可选的求和运算(.add)指定求这些差的和。
+
+参考文档“在CUDA中使用内联PTX汇编"了解在代码中使用汇编的细节。参考PTX指令集文档“并行线程执行指令集版本3.0“了解你所使用PTX版本的详细指令信息。

@@ -1,0 +1,86 @@
+\chapter{导论}
+
+\section{从图形处理到通用并行计算}
+
+市场对实时、高清晰度的三维图形具有无法满足的需求，由于这种需求的推动，可编程图形处理器（GPU）已经演化成高并行度，多线程，拥有强大计算能力和极高存储器带宽的多核处理器，如图\ref{fig:fpops}和图\ref{fig:mb}所示：
+\begin{figure}[htbp]
+\centering
+\includegraphics[bb=0 0 356 281]{figures/floating-point-operations-per-second.png}
+\caption{GPU和CPU每秒浮点操作数}
+\label{fig:fpops}
+\end{figure}
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[bb=0 0 315 259]{figures/memory-bandwidth.png}
+\caption{GPU和CPU存储器带宽}
+\label{fig:mb}
+\end{figure}
+
+GPU和CPU的浮点计算能力差异的原因是：GPU是特别为计算密集，高并行度计算（如同图像渲染）设计的，因此将更多的晶体管用于数据处理而不是数据缓存和流控，如图\ref{fig:gdmttdp}所示。
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[bb=0 0 310 101]{figures/gpu-devotes-more-transistors-to-data-processing.png}
+\caption{GPU将更多的晶体管用于数据处理}
+\label{fig:gdmttdp}
+\end{figure}
+
+
+特别地，GPU非常适合处理那些能够表示为数据并行计算（同一程序在多个数据上并行执行）的问题，数据并行计算的算术计算密度（算术操作和存储器操作的比例）非常高。由于同一程序在每个元素上执行，因此对复杂流控的要求非常少，更因为在多个元素上执行和高计算密度，访存延迟可以被计算隐藏，因此无须大的数据缓存。
+
+数据并行处理将数据元素映射到并行处理的线程上。很多处理大的数据集的应用可以使用数据并行处理模型加速。三维图像渲染处理中，大量的像素和顶点被映射到并行线程。类似地，图像和多媒体处理应用、图像渲染的后处理、视频编解码、图像缩放、立体视觉和模式识别能够将图像块和像素映射到并行处理的线程。实际上，除了图像渲染和处理领域，还有很多算法已被数据并行处理加速，从普通信号处理或物理模拟到计算金融或计算生物学。
+
+\section{CUDA$^{TM}$：一种通用并行计算架构}
+
+2006年11月，英伟达推出了CUDA$^{TM}$，一种基于新的并行编程模型和指令集架构的通用计算架构，CUDA能够利用英伟达GPU的并行计算引擎比CPU更高效的解决许多复杂计算任务。
+
+CUDA包含一个让开发者能够使用C作为高级编程语言的软件环境。如图\ref{fig:gca}所示，其它的语言、应用编程接口（API）和基于编译制导的方式也被支持，如FORTRAN、Direct Compute和OpenACC。
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[bb=0 0 346 291]{figures/gpu-computing-applications.png}
+\caption{CUDA设计为支持多种语言和应用编程接口}
+\label{fig:gca}
+\end{figure}
+
+
+\section{一种可扩展的编程模型}
+
+多核CPU和众核GPU的出现，意味着主流处理器芯片现在已经是并行系统了。更进一步的说，他们的并行度将继续以摩尔定律扩展。面临的挑战是开发透明的扩展并行度以利用不断增加的处理器核心数的应用软件，更像三维图形应用透明的扩展他们的并行度到不同数目核心的GPU上一样。
+
+设计CUDA并行编程模型是为了在克服这种挑战的同时，使得熟悉标准编程语言（如C）的程序员保持一个比较低的学习曲线。
+
+CUDA核心包含三个重点抽象：线程组层次、共享存储器和栅栏同步，这些被作为一个最小的语言扩展集简单呈现（expose）给程序员。
+
+这些抽象提供了细粒度数据并行度和线程并行度，嵌套在粗粒度数据并行和任务并行中。他们引导程序员将问题划分为可以被多个块内线程独立并行处理的粗粒度子问题，而每个子问题又被分为可以被一个块内线程并行协作处理的更小的片段。这种分解通过在处理子问题的时候允许线程协作保持了语言的表达性，同时保证了自动可扩展性。事实上，每个块可被调度到可用处理器核心的任意一个上，以任何顺序，并行或者串行执行，这使得已编译好的CUDA程序能够在任意核心的GPU上执行，如图\ref{fig:as}所示，只有运行时系统需要知道物理处理器的数量。
+
+这种可扩展的编程模型允许CUDA架构通过简单的缩放处理器的数量和存储器分区的数量来满足市场不同层次的需求：从高性能发烧友级精视GPU和专业级的Quadro和Tesla计算产品到多种便宜、主流的精视GPU（参看\ref{sec:gpucuda}关于支持CUDA的GPU列表）
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[bb=0 0 310 242]{figures/automatic-scalability.png}
+\caption{自动可扩展性}
+\label{fig:as}
+\end{figure}
+
+
+注意：GPU围绕流多处理器阵列组建（查看\ref{sec:hardimplementation}以了解更多细节）。多线程程序被划分为线程块，线程块的执行相互独立，所以程序在一个流多处理器多的GPU上执行时间自动（译者注：指不需要用户做任何工作）的比在一个流多处理器少的GPU上少。
+
+\section{文档结构}
+
+本文档包括以下各章
+\begin{itemize}
+\item 介绍：CUDA基本介绍
+\item 编程模型：CUDA编程模型要点
+\item 编程接口：编程接口描述
+\item 硬件实现：硬件实现描述
+\item 性能指南：给出一些获得最高性能的优化指南
+\item 支持CUDA的GPU：给出所有支持CUDA的GPU列表
+\item C语言扩展：CUDA C扩展的详细说明
+\item 数学函数：CUDA支持的数学函数列表
+\item C/C++语言支持：设备代码支持的C++特性列表
+\item 纹理获取：更详细的纹理获取说明
+\item 计算能力：给出各种设备的技术规范，更多架构详细说明
+\item 驱动API：低层驱动API的介绍。
+\end{itemize}

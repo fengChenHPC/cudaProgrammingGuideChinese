@@ -1,0 +1,260 @@
+\chapter{驱动API}
+\label{sec:driver}
+
+本附录假设你了解\ref{sec:runtime}的概念。
+
+驱动API的实现在nvcuda动态库中，其所有的入口点前缀为cu，在设备驱动安装时，nvcuda会被拷贝到系统中。
+
+驱动API是基于句柄的，命令式的：大多数对象通过不透明的句柄引用，函数通过句柄操作对象。
+
+驱动API可用的对象总结如\ref{tab:objdriver}
+
+\begin{table}[htbp]
+\caption{CUDA驱动API中可用的对象}
+\begin{tabular}
+{|p{80pt}|p{89pt}|p{222pt}|}
+\hline
+\textbf{对象}& \textbf{句柄}& \textbf{描述} \\
+\hline
+设备& CUdevice& 支持 CUDA 的设备 \\
+\hline
+上下文& CUcontext& 大致等同于 CPU 进程 \\
+\hline
+模块& CUmodule& 大致等同于动态库 \\
+\hline
+函数& CUfunction& 内核 \\
+\hline
+堆存储器& CUdeviceptr& 设备存储器的指针 \\
+\hline
+CUDA 数组& CUarray& 设备上一维或二维数据的不透明容器，通过纹理参考读取 \\
+\hline
+纹理参考& CUtexref& 描述如何解释纹理存储器数据的对象 \\
+\hline
+表面参考& CUsurfref& 描述如何读写CUDA 数组的对象 \\
+\hline
+\end{tabular}
+\label{tab:objdriver}
+\end{table}
+
+在调用任何其它驱动API前必须用cuInit()初始化驱动API。然后必须创建一个CUDA上下文，该上下文关联到特定设备并成为主机线程的当前上下文，详见\ref{sec:context}。
+
+在CUDA上下文中，内核必须显式的作为PTX或二进制对象被主机代码加载，参见\ref{sec:module}。用C写的内核必须独立的编译成PTX或二进制对象。发射内核使用的API入口点可参见\ref{sec:kernelExe}。
+
+任何想要在未来的设备架构上运行的应用必须加载PTX，而不是二进制代码。这是因为二进制是架构相关的，因此和未来的架构不兼容，而PTX代码可被驱动在加载时编译成二进制代码。
+
+下面是\ref{sec:kernels}节例子的驱动API实现：
+
+\begin{lstlisting}
+int main()
+{
+    int N = ...;
+    size_t size = N * sizeof(float);
+
+    // Allocate input vectors h\_A and h\_B in host memory
+    float* h_A = (float*)malloc(size);
+    float* h_B = (float*)malloc(size);
+
+    // Initialize input vectors
+    ...
+
+    // Initialize
+    cuInit(0);
+
+    // Get number of devices supporting CUDA
+    int deviceCount = 0;
+    cuDeviceGetCount(&deviceCount);
+    if (deviceCount == 0) {
+        printf("There is no device supporting CUDA.\n");
+        exit (0);
+    }
+
+    // Get handle for device 0
+    CUdevice cuDevice;
+    cuDeviceGet(&cuDevice, 0);
+
+    // Create context
+    CUcontext cuContext;
+    cuCtxCreate(&cuContext, 0, cuDevice);
+
+    // Create module from binary file
+    CUmodule cuModule;
+    cuModuleLoad(&cuModule, "VecAdd.ptx");
+
+    // Allocate vectors in device memory
+    CUdeviceptr d_A;
+    cuMemAlloc(&d_A, size);
+    CUdeviceptr d_B;
+    cuMemAlloc(&d_B, size);
+    CUdeviceptr d_C;
+    cuMemAlloc(&d_C, size);
+
+    // Copy vectors from host memory to device memory
+    cuMemcpyHtoD(d_A, h_A, size);
+    cuMemcpyHtoD(d_B, h_B, size);
+
+    // Get function handle from module
+    CUfunction vecAdd;
+    cuModuleGetFunction(&vecAdd, cuModule, "VecAdd");
+
+    // Invoke kernel
+    int threadsPerBlock = 256;
+    int blocksPerGrid =
+            (N + threadsPerBlock – 1) / threadsPerBlock;
+    void* args[] = { &d_A, &d_B, &d_C, &N };
+    cuLaunchKernel(vecAdd,
+                   blocksPerGrid, 1, 1, threadsPerBlock, 1, 1,
+                   0, 0, args, 0);
+
+    ...
+}
+\end{lstlisting}
+全部代码可在SDK中的vectorAddDrv例子中找到。
+
+\section{上下文}
+\label{sec:context}
+CUDA 上下文类似于CPU的进程。所有资源和在驱动程序 API 中执行的操作都封装在 CUDA 上下文内，在销毁上下文时，系统将自动清理这些资源。除了模块和纹理参考之类的对象外，每个上下文都有自己不同的地址空间。因而，不同上下文的 CUdeviceptr 值将引用不同的存储器空间。
+
+一个主机线程在某时只能有一个当前设备上下文。当使用 cuCtxCreate() 创建上下文时，它将成为主机调用线程的当前上下文。如果有效上下文不是线程的当前上下文，在该线程中操作的 CUDA 函数（不涉及设备模拟或上下文管理的大多数函数）将返回 CUDA{\_}ERROR{\_}INVALID{\_}CONTEXT。
+
+每个主机线程都有一个当前上下文堆栈。cuCtxCreate() 将新上下文压入栈顶。可调用cuCtxPopCurrent() 分离上下文与主机线程。随后此上下文将成为``游魂（floating）''上下文，可作为任意主机线程的当前上下文入栈。cuCtxPopCurrent() 还可重建之前的当前上下文（如果有）。
+
+此外还会为每个上下文维护一个引用计数（usage count）。cuCtxCreate()创建一个将引用计数为1的上下文。cuCtxAttach()递增计数，而 cuCtxDetach() 则递减。当调用cuCtxDetach()时计数为 0 或 cuCtxDestroy()，上下文将被销毁。
+
+引用计数有利于同一上下文中第三方授权代码间的互操作。比如，如果载入了三个使用相同上下文的库，则每个库都将调用cuCtxAttach() 来递增计数，并在库不再使用该上下文时调用 cuCtxDetach() 递减计数。对大多数库来说，应用应当在载入或初始化库之前创建一个上下文，通过这种方式，应用可使用自己的启发式（heuristics）方法来创建上下文，库只需在传递给它的上下文中简单操作。希望创建自己的上下文的库（其客户端并不了解这种情况，并且可能已经创建或未创建自己的上下文）可使用cuCtxPushCurrent() 和 cuCtxPopCurrent()，如\ref{fig:contextmanagement}所示。
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[bb=0 0 291 156]{figures/library-context-management.png}
+\caption{库上下文管理}
+\label{fig:contextmanagement}
+\end{figure}
+
+
+\section{模块}
+\label{sec:module}
+模块是可动态加载的设备代码和数据包，和 Windows 中的 DLL类似，是由 nvcc输出的（参见\ref{sec:nvcccompile}）。所有符号的名称，包括函数、全局变量、纹理参考或表面参考均在模块范围内维护，所以独立的第三方编写的模块可在同一CUDA 上下文中互操作。
+
+下面的代码示例载入了一个模块并检索内核的句柄：
+\begin{lstlisting}
+CUmodule cuModule;
+cuModuleLoad(&cuModule, "myModule.ptx");
+CUfunction myKernel;
+cuModuleGetFunction(&myKernel, cuModule, "MyKernel");
+\end{lstlisting}
+
+下面的代码编译并加载来自于PTX代码的新模块且解析编译错误：
+
+\begin{lstlisting}
+#define ERROR_BUFFER_SIZE 100
+CUmodule cuModule;
+CUjit_option options[3];
+void* values[3];
+char* PTXCode = "some PTX code";
+options[0] = CU_ASM_ERROR_LOG_BUFFER;
+values[0]  = (void*)malloc(ERROR_BUFFER_SIZE);
+options[1] = CU_ASM_ERROR_LOG_BUFFER_SIZE_BYTES;
+values[1]  = (void*)ERROR_BUFFER_SIZE;
+options[2] = CU_ASM_TARGET_FROM_CUCONTEXT;
+values[2]  = 0;
+cuModuleLoadDataEx(&cuModule, PTXCode, 3, options, values);
+for (int i = 0; i < values[1]; ++i) {
+    // Parse error string here
+}
+\end{lstlisting}
+
+
+\section{内核执行}
+\label{sec:kernelExe}
+cuLaunchKernel()启动一个指定执行配置的内核。
+
+参数要么作为指针数组（靠近cuLaunchKernel()的最后一个参数）传递，此时第n个指针对应第n个参数且指向要拷贝参数的存储器区域，要么作为额外选项之一（cuLaunchKernel()的最后参数）。
+
+当参数作为额外选项传递（CU{\_}LAUNCH{\_}PARAM{\_}BUFFER{\_}POINTER选项），它们作为单个缓冲区的指针传递，此时通过为每个设备代码中的参数类型匹配对齐要求，它们之间保证合适的偏移。
+
+设备代码中内置向量类型的对齐要求列在\ref{sec:vectortype}中。对于所有其它基本类型，设备代码和主机代码的对齐要求一致，且可通过使用{\_}alignof()获得。唯一的例外是，当主机编译器将双精度和long long（或者64位机的long）对齐在单字边界而非双字边界（例如使用gcc的-mno-align-double编译选项）时，因为在设备代码中，这些类型永远以双字对齐。
+
+CUdeviceptr是整形，但代表指针，所以它的对齐要求是{\_}{\_}alignof(void*)。
+
+下面的代码使用宏（ALIGN{\_}UP）调整每个参数的偏移以满足对齐要求，另一个宏（ADD{\_}TO{\_}PARAM{\_}BUFFER()）将每个参数加到参数缓冲区，该参数缓冲区被传递到CU{\_}LAUNCH{\_}PARAM{\_}BUFFER{\_}POINTER选项。
+\begin{lstlisting}
+#define ALIGN_UP(offset, alignment) \
+      (offset) = ((offset) + (alignment) – 1) & ~((alignment) – 1)
+
+char paramBuffer[1024];
+size_t paramBufferSize = 0;
+
+#define ADD_TO_PARAM_BUFFER(value, alignment)                   \
+    do {                                                        \
+        paramBufferSize = ALIGN_UP(paramBufferSize, alignment); \
+        memcpy(paramBuffer + paramBufferSize,                   \
+               &(value), sizeof(value));                        \
+        paramBufferSize += sizeof(value);                       \
+    } while (0)
+
+int i;
+ADD_TO_PARAM_BUFFER(i, __alignof(i));
+float4 f4;
+ADD_TO_PARAM_BUFFER(f4, 16); // float4’s alignment is 16
+char c;
+ADD_TO_PARAM_BUFFER(c, __alignof(c));
+float f;
+ADD_TO_PARAM_BUFFER(f, __alignof(f));
+CUdeviceptr devPtr;
+ADD_TO_PARAM_BUFFER(devPtr, __alignof(devPtr));
+float2 f2;
+ADD_TO_PARAM_BUFFER(f2, 8); // float2’s alignment is 8
+
+void* extra[] = {
+    CU_LAUNCH_PARAM_BUFFER_POINTER, paramBuffer,
+    CU_LAUNCH_PARAM_BUFFER_SIZE,    &paramBufferSize,
+    CU_LAUNCH_PARAM_END
+};
+cuLaunchKernel(cuFunction,
+               blockWidth, blockHeight, blockDepth,
+               gridWidth, gridHeight, gridDepth,
+               0, 0, 0, extra);
+\end{lstlisting}
+
+结构体的对齐要求等于它的域的最大对齐要求。包含内置向量类型，CUdeviceptr，或非对齐双精度和long 
+long的对齐要求在主机和设备中可能不同。这种结构体的填充可能也不同。例如，下面的结构体在主机上根本不加填充，但在设备中会在f后加上12个字节的填充，因为对f4域的对齐要求是16。
+
+\begin{lstlisting}
+typedef struct {
+    float  f;
+    float4 f4;
+} myStruct;
+\end{lstlisting}
+
+\section{运行时API和驱动API的互操作性}
+
+应用可以混合使用运行时API和驱动API。
+
+如果上下文是使用驱动API创建并成当前上下文的，随后的运行时调用将使用这个上下文而不是新建一个。
+
+如果运行时已经隐式初始化（如\ref{sec:runtime}提到的），可以使用cuCtxAttach()检索初始化间创建的上下文，在随后的驱动API调用中可使用它。
+
+设备存储器可使用任何一种API分配和释放。CUdeviceptr也可以转型为常规指针，反之亦然。
+
+\begin{lstlisting}
+CUdeviceptr devPtr;
+float* d_data;
+
+// Allocation using driver API
+cuMemAlloc(&devPtr, size);
+d_data = (float*)devPtr;
+
+// Allocation using runtime API
+cudaMalloc(&d_data, size);
+devPtr = (CUdeviceptr)d_data;
+\end{lstlisting}
+
+
+特别地，这意味着使用驱动API编写的应用能够调用运行时API编写的库（如CUFFT，CUBLAS，....)。
+
+手册中设备和版本管理节的所有函数可互换使用。
+
+
+\section{注意}
+
+本手册直接翻译自官方手册，相关法律或版权问题请以原版为准。
+

@@ -1,0 +1,76 @@
+\chapter{纹理获取}
+\label{sec:texfetch}
+本附录提供了用于根据纹理引用(参见\ref{sec:texturemem})的不同属性计算纹理函数（参见\ref{sec:texturefunctions}）的返回值的公式。
+
+绑定到纹理参考的纹理表示为数组 T，
+\begin{itemize}
+\item对于一维纹理，它有 N 个纹理元素
+\item对于二维纹理它有$N \times M$个元素，
+\item对于三维纹理它有 $N \times M \times L $个 元素。
+\end{itemize}
+
+它将使用非归一化的纹理坐标 x、y 和 z 或归一化的纹理坐标x/N, y/M 和z/L获取，这在\ref{sec:texturemem}中描述。本附录假设纹理坐标必须位于 T 的有效寻址范围内。\ref{sec:texturemem}解释了越界坐标如何依据寻址模式映射到有效寻址范围内。
+
+\section{最近点取样}
+
+在这种过滤模式中，纹理获取返回的值如下：
+\begin{itemize}
+\item 对于一维纹理是$tex(x)=T[i]$ 
+\item 对于二维纹理是$tex(x, y)=T[i, j]$
+\item 对于三维纹理是$tex(x, y, z)=T[i, j, k]$
+\end{itemize}
+
+其中 $i = floor(x), j = floor( y), k = floor(z)$。
+
+\ref{fig:nearestpointsampling}展示了一维纹理的最近点取样(N =4)。
+
+对于整型纹理来说，纹理获取的返回值可重新映射到 [0.0, 1.0]（参见\ref{sec:texturemem}）。
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[bb=0 0 354 241]{figures/nearest-point-sampling-of-1-d-texture-of-4-texels.png}
+\caption{4个像素的一维纹理最近点取样}
+\label{fig:nearestpointsampling}
+\end{figure}
+
+\section{线性滤波}
+
+在这种仅对浮点纹理可用的过滤模式中，纹理获取的返回值如下：
+\begin{itemize}
+\item 对于一维纹理是$tex(x)=(1-\alpha)T[i]+\alpha T[i+1]$
+\item 对于二维纹理是$tex(x,y)=(1-\alpha)(1-\beta)T[i,j]+\alpha (1-\beta )T[i+1,j]+(1-\alpha )\beta T[i,j+1]+\alpha \beta T[i+1,j+1]$
+\item 对于三维纹理是$tex(x,y,z)=(1-\alpha)(1-\beta)(1-\gamma)T[i,j,k]+\alpha (1-\beta)(1-\gamma)T[i+1,j,k]+(1-\alpha)(1-\beta)\gamma T[i,j,k+1]+\alpha (1-\beta)\gamma T[i+1,j,k+1]+(1-\alpha)\beta \gamma T[i,j+1,k+1]+\alpha \beta \gamma T[i+1,j+1,k+1]$
+\end{itemize}
+其中：
+\begin{itemize}
+\item $i= floor(x_B), \alpha = frac(x_B), x_B = x-0.5$；
+\item $j= floor(y_B), \beta = frac(y_B), y_B = y-0.5$；
+\item $k= floor(z_B), \gamma = frac(z_B), z_B = z-0.5$。
+\end{itemize}
+
+$\alpha $、$\beta$ 和$\gamma$ 存储在9位的定点格式中，其中8位表示分数值（所以1.0是准确表示的）。
+
+\ref{fig:linearfiltering}展示了一维纹理的线性取样，N = 4。
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[bb=0 0 310 187]{figures/linear-filtering-of-1-d-texture-of-4-texels.png}
+\caption{4个像素、钳位寻址模式下的一维纹理线性滤波}
+\label{fig:linearfiltering}
+\end{figure}
+
+\section{查找表}
+
+查找表函数$TL(x)$可实现为$TL(x) = tex((N-1)/R)x+0.5)$，这样即可确保$TL(0) = T[0]$ 且 $TL(R)=T[N-1]$。其中$x$处于$[0, R]$ 的范围内。
+
+\ref{fig:lookuptable}展示了利用纹理过滤来实现表查找，其中$R=4$或$R=1$，来自 N=4 的一维纹理。
+\begin{figure}[htbp]
+\centering
+\includegraphics[bb=0 0 341 242]{figures/table-lookup-using-linear-filtering.png}
+\caption{使用线性滤波的一维查找表}
+\label{fig:lookuptable}
+\end{figure}
+
+
+
+

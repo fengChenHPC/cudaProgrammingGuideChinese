@@ -1,0 +1,378 @@
+\chapter{C++语言支持}
+\label{sec:cppsupport}
+正如\ref{sec:nvcccompile}所描述的，使用nvcc编译的源码文件能够混合主机代码和设备代码。
+
+对于主机代码，nvcc支持主机C++编译器支持的C++ ISO/IEC 14882:2003规范的任意部分。
+
+对于设备代码，在\ref{sec:cpprestriction}描述的限制下，nvcc支持\ref{sec:cppexample}描述的特性；不支持运行时类型信息、异常处理和C++标准库。
+
+\section{代码例子}
+\label{sec:cppexample}
+\subsection{数据类}
+\begin{lstlisting}
+class PixelRGBA {
+public:
+    __device__ PixelRGBA(): r_(0), g_(0), b_(0), a_(0) { }
+    
+    __device__ PixelRGBA(unsigned char r, unsigned char g,
+                         unsigned char b, unsigned char a = 255):
+                         r_(r), g_(g), b_(b), a_(a) { }
+    
+private:
+    unsigned char r_, g_, b_, a_;
+    
+    friend PixelRGBA operator+(const PixelRGBA const PixelRGBA&);
+};
+
+__device__ 
+PixelRGBA operator+(const PixelRGBA& p1, const PixelRGBA& p2)
+{
+    return PixelRGBA(p1.r_ + p2.r_, p1.g_ + p2.g_, 
+                     p1.b_ + p2.b_, p1.a_ + p2.a_);
+}
+
+__device__ void func(void)
+{
+    PixelRGBA p1, p2;
+    // ...      // Initialization of p1 and p2 here
+    PixelRGBA p3 = p1 + p2;
+}
+\end{lstlisting}
+
+\subsection{派生类}
+\begin{lstlisting}
+__device__ void* operator new(size_t bytes, MemoryPool& p);
+__device__ void operator delete(void*, MemoryPool& p);
+class Shape {
+public:
+    __device__ Shape(void) { }
+    __device__ void putThis(PrintBuffer *p) const;
+    __device__ virtual void Draw(PrintBuffer *p) const {
+         p->put("Shapeless"); 
+    }
+    __device__ virtual ~Shape() {}
+};
+class Point : public Shape {
+public:
+    __device__ Point() : x(0), y(0) {}
+    __device__ Point(int ix, int iy) : x(ix), y(iy) { }
+    __device__ void PutCoord(PrintBuffer *p) const;
+    __device__ void Draw(PrintBuffer *p) const;
+    __device__ ~Point() {}
+private:
+    int x, y;
+};
+__device__ Shape* GetPointObj(MemoryPool& pool)
+{
+    Shape* shape = new(pool) Point(rand(-20,10), rand(-100,-20));
+    return shape;
+}
+\end{lstlisting}
+
+\subsection{类模板}
+\begin{lstlisting}
+template <class T>
+class myValues {
+    T values[MAX_VALUES];
+public:
+    __device__ myValues(T clear) { ... }
+    __device__ void setValue(int Idx, T value) { ... }
+    __device__ void putToMemory(T* valueLocation) { ... }
+};
+
+template <class T>
+void __global__ useValues(T* memoryBuffer) {
+    myValues<T> myLocation(0);
+    ...
+}
+
+__device__ void* buffer;
+
+int main()
+{
+    ...
+    useValues<int><<<blocks, threads>>>(buffer);
+    ...
+}
+\end{lstlisting}
+
+\subsection{函数模板}
+\begin{lstlisting}
+template <typename T> 
+__device__ bool func(T x) 
+{
+   ...
+   return (...);
+}
+
+template <> 
+__device__ bool func<int>(T x) // Specialization
+{
+   return true;
+}
+
+// Explicit argument specification
+bool result = func<double>(0.5);
+
+// Implicit argument deduction
+int x = 1;
+bool result = func(x);
+\end{lstlisting}
+
+\subsection{函子类}
+\begin{lstlisting}
+class Add {
+public:
+    __device__  float operator() (float a, float b) const
+    {
+        return a + b;
+    }
+};
+
+class Sub {
+public:
+    __device__  float operator() (float a, float b) const
+    {
+        return a - b;
+    }
+};
+
+// Device code
+template<class O> __global__ 
+void VectorOperation(const float * A, const float * B, float * C,
+                     unsigned int N, O op)
+{
+    unsigned int iElement = blockDim.x * blockIdx.x + threadIdx.x;
+    if (iElement < N)
+        C[iElement] = op(A[iElement], B[iElement]);
+}
+
+// Host code
+int main()
+{
+    ...
+    VectorOperation<<<blocks, threads>>>(v1, v2, v3, N, Add());
+    ...
+}
+\end{lstlisting}
+
+\section{限制}
+\label{sec:cpprestriction}
+
+\subsection{预处理符号}
+如果\_\_global\_\_函数模板从主机实例化和启动，无论\_\_CUDA\_ARCH\_\_宏是否存在或者取何值，函数模板必须使用相同的类型实例化。
+
+下面的例子中，$kern<int>$只在\_\_CUDA\_ARCH\_\_没有定义的情况下实例化，这不被支持。
+\begin{lstlisting}
+  __device__ int result;
+template <typename T>
+__global__ void kern(T in)
+{
+  result = in;
+}
+
+__host__ __device__ void foo(void)
+{
+#if !defined(__CUDA_ARCH__)
+  kern<<<1,1>>>(1);      // instantiation "kern<int>"
+#endif 
+}
+
+int main(void)
+{
+  foo();
+  cudaDeviceSynchronize();
+  return 0;
+}
+\end{lstlisting}
+
+\subsection{限定符}
+
+\subsubsection{设备存储器限定符}
+
+{\_}{\_}device{\_}{\_}、{\_}{\_}shared{\_}{\_}和{\_}{\_}constant{\_}{\_}限定符不允许：
+\begin{itemize}
+\item 类、结构体和联合成员
+\item 形式参数
+\item 主机上执行函数的局部变量
+\end{itemize}
+
+{\_}{\_}shared{\_}{\_} 和 {\_}{\_}constant{\_}{\_} 变量具有隐含的静态存储。
+
+{\_}{\_}device{\_}{\_} 和 {\_}{\_}constant{\_}{\_} 变量仅允许在命名空间作用域内定义（包括全局命名空间）。
+
+命名空间作用域内定义的类类型的{\_}{\_}device{\_}{\_}、{\_}{\_}shared{\_}{\_} 和 {\_}{\_}constant{\_}{\_} 变量不能有非空的构造器和析构器。类的构造器是一个无关紧要的构造器，或者满足下面的所有条件时，在编译单元的某个时间点被认为是空的：
+\begin{itemize}
+\item 构造器函数已定义。
+\item 构造器函数没有参数，初始化列表为空，函数体为空。
+\item 类没有虚函数或虚基类。
+\item 所有基类的默认构造器可认为为空。
+\item 类的所有非静态类类型的数据成员或数组的默认构造器可被认为是空的。
+\end{itemize}
+
+类的析构器是一个无关紧要的构造器，或者满足下面的所有条件时，在编译单元的某个时间点被认为是空的：
+\begin{itemize}
+\item 析构器已定义。
+\item 析构器函数体没有语句。
+\item 类没有虚函数和虚基类。
+\item 所有基类的析构器可被认为是空。
+\item 类的所有非静态类类型数据成员或数组的默认析构器可被认为是空的。
+\end{itemize}
+
+如果以全程序编译模式编译时（参见nvcc用户手册），\_\_device\_\_、\_\_shared\_\_ 和 \_\_constant\_\_ 变量不能使用 extern 关键字定义为外部变量。唯一的例外是如\ref{sec:shared}描述的定义动态分配的共享存储器。
+
+如果以分离编译模式编译（参见nvcc用户手册），\_\_device\_\_、\_\_shared\_\_ 和 \_\_constant\_\_ 变量能够使用 extern 关键字定义为外部变量。当nvlink找不到外部变量的定义时，会产生错误（除非是动态分配的共享存储器）。
+
+\subsubsection{Volatile限定符}
+
+只有在执行{\_}{\_}threadfence{\_}block()、{\_}{\_}threadfence()或{\_}{\_}syncthreads()之后（参见\ref{sec:memfence}和\ref{sec:synchronizefunction}节），在此之前对全局存储器或共享存储器写入的才能保证对其它线程可见。只要满足这个要求，编译器可任意优化对全局存储器或共享存储器的读写。
+
+这种行为可以使用volatile关键字改变：如果全局存储器或共享存储器中的变量被声明为volatile，编译器假定它的值可能在任何时候被其它线程改变或使用，因此每次对它的引用都会被编译成一条实际的读存储器指令。
+
+\subsection{指针}
+
+在计算能力1.x的设备上，只要编译器能够确定在设备上执行的代码中的指针指向的是共享存储器空间、全局存储器空间或本地存储器，此类指针即受支持，否则将仅限于指向在全局存储器空间中分配或声明的存储器。在计算能力2.0及以上的设备上，指针的支持没有限制。
+
+如果在主机上执行的代码中解引用全局或共享存储器指针，或者在设备上执行的代码中解引用主机存储器指针，结果没有定义，往往会出现分区错误和应用程序终止。
+
+通过取 {\_}{\_}device{\_}{\_}、{\_}{\_}shared{\_}{\_} 或 {\_}{\_}constant{\_}{\_} 变量的地址而获得的地址仅可在设备代码中使用。通过 cudaGetSymbolAddress() （参见\ref{sec:devicemem}）获取的 {\_}{\_}device{\_}{\_} 或 {\_}{\_}constant{\_}{\_} 变量的地址仅可在主机代码中使用。
+
+由于使用了C++的语法规则，void指针（如malloc()函数返回）必须要转型才能赋值给非void指针。
+
+\subsection{运算符}
+
+\subsubsection{赋值运算符}
+
+不能在设备端给 {\_}{\_}constant{\_}{\_} 变量赋值，仅可通过主机运行时函数从主机赋值（参见\ref{sec:devicemem}）。
+
+{\_}{\_}shared{\_}{\_} 变量的声明中不可包含初始化。
+
+不允许为\ref{sec:bulti-in}定义的任何内置变量赋值。
+
+\subsubsection{地址运算符}
+
+不允许取\ref{sec:bulti-in}定义的任何内置变量的地址。
+
+\subsection{函数}
+
+\subsubsection{编译器生成的函数}
+编译器生成函数的执行空间限定符（\_\_host\_\_，\_\_device\_\_）是所有调用此函数的函数的限定符的并集（注意，在此分析中，\_\_global\_\_调用函数都被认为是\_\_device\_\_调用者）。例如：
+\begin{lstlisting}
+class Base {
+  int x;
+public:  
+  __host__ __device__ Base(void) : x(10) {}
+};
+
+class Derived : public Base {
+  int y;
+};
+
+class Other: public Base {
+  int z;
+};
+
+__device__ void foo(void)
+{
+  Derived D1;
+  Other D2;
+}
+
+__host__ void bar(void)
+{
+  Other D3;
+}
+\end{lstlisting}
+这里，编译器生成的构造器函数"Derived::Derived"将被视为为\_\_device\_\_函数，因为它只被\_\_device\_\_函数"foo"调用。编译器生成的构造器函数"Other::Other"将被视为"\_\_device\_\_ \_\_host\_\_函数，因为它同时被\_\_device\_\_函数"foo"和\_\_host\_\_函数"bar"调用。
+
+\subsubsection{函数参数}
+
+{\_}{\_}global{\_}{\_} 函数参数将传递给设备：
+\begin{itemize}
+\item 计算能力1.x的使用共享存储器传递，且大小限制为 256 字节，
+\item 计算能力2.x及以上的设备上的通过常量存储器传递，且其大小限制为4K字节。
+\end{itemize}
+{\_}{\_}device{\_}{\_} 和 {\_}{\_}global{\_}{\_} 函数的函数体内无法声明静态变量。
+
+%{\_}{\_}device{\_}{\_} 和 {\_}{\_}global{\_}{\_} 函数不得使用可变参数列表。
+
+\subsubsection{函数内静态变量}
+
+不能在{\_}{\_}device{\_}{\_}和{\_}{\_}global{\_}{\_}函数体内声明静态变量。
+
+\subsubsection{函数指针}
+
+主机代码支持指向{\_}{\_}global{\_}{\_}函数的函数指针，但是设备代码不支持。
+
+指向{\_}{\_}device{\_}{\_}函数的函数指针只在计算能力2.x及以上的设备上得到支持。
+
+不允许在主机代码中取{\_}{\_}device{\_}{\_} 函数地址。
+
+\subsubsection{函数递归}
+
+{\_}{\_}global{\_}{\_} 函数不支持递归。
+
+{\_}{\_}device{\_}{\_}函数只在为计算能力2.x及以上的设备编译的设备代码上支持递归。
+
+\subsection{类}
+
+\subsubsection{数据成员}
+
+不支持静态数据成员。
+
+设备代码中位域的层次目前和Windows上的主机代码的层次不一致。
+
+\subsubsection{函数成员}
+
+{\_}{\_}global{\_}{\_}函数不能做静态成员函数
+
+\subsubsection{虚函数}
+
+当子类覆盖父类的虚函数时，执行空间限定符必须匹配。
+
+不允许将有虚函数的类的对象作为参数传给{\_}{\_}global{\_}{\_}函数。
+
+虚函数表由编译器存放在全局存储器或者常量存储器中。
+
+\subsubsection{虚基类}
+
+不允许将虚基类派生类的对象作为参数传给{\_}{\_}global{\_}{\_}函数。
+
+\subsubsection{Windows相关}
+
+在Windows上，对于类类型T的一个C++对象，满足下列条件的任意一种，CUDA编译器可能产生和微软编译器不同的存储器层次。
+\begin{itemize}
+\item T 有虚函数或直接或间接的派生自有虚函数的类；
+\item T有直接或间接的虚基类；
+\item T直接或间接的多继承自多个空基类。
+\end{itemize}
+
+在主机和设备代码中，这些对象的尺寸可能也不相同。只要在主机代码和设备代码中互斥的使用T，程序就可正确工作。不要在主机和设备代码间传递类型T的对象（如作为{\_}{\_}global{\_}{\_}函数的参数或通过cudaMemcpy*()调用）。
+
+\subsection{模板}
+
+{\_}{\_}global{\_}{\_}函数模板不能够实例化为在函数内定义或是类或结构体的私有成员的类型或类型重定义（typedef），如下面的样本代码所示。
+\begin{lstlisting}
+template <typename T>
+__global__ void myKernel1(void) { }
+
+template <typename T>
+__global__ void myKernel2(T par) { }
+
+class myClass {
+private:
+    struct inner_t { }; 
+public:
+    static void launch(void) 
+    {
+       // Both kernel launches below are disallowed
+       // as myKernel1 and myKernel2 are instantiated
+       // with private type inner\_t
+
+       myKernel1<inner_t><<<1,1>>>();
+
+       inner_t var; 
+       myKernel2<<<1,1>>>(var);
+    }
+};
+\end{lstlisting}
